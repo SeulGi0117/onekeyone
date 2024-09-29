@@ -1,14 +1,48 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // image_picker 패키지 추가
+import 'package:image_picker/image_picker.dart';
+import '../services/plant_identification_service.dart';
+import '../widgets/plant_identification_loading_screen.dart';
+import 'plant_identification_result_page.dart';
 
-class PlantRegistrationPage extends StatelessWidget {
+class PlantRegistrationPage extends StatefulWidget {
+  @override
+  _PlantRegistrationPageState createState() => _PlantRegistrationPageState();
+}
+
+class _PlantRegistrationPageState extends State<PlantRegistrationPage> {
   final ImagePicker _picker = ImagePicker();
+  final PlantIdentificationService _plantService = PlantIdentificationService();
 
-  Future<void> _takePhoto() async {
-    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-    if (photo != null) {
-      // 사진이 선택되었을 때의 처리
-      print('Photo taken: ${photo.path}');
+  Future<void> _processImage(ImageSource source) async {
+    final XFile? image = await _picker.pickImage(source: source);
+    if (image != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return PlantIdentificationLoadingScreen(imagePath: image.path);
+        },
+      );
+
+      try {
+        final plantInfo = await _plantService.identifyPlant(image.path);
+        Navigator.of(context).pop(); // 로딩 화면 닫기
+
+        // 결과 페이지로 이동
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PlantIdentificationResultPage(
+              imagePath: image.path,
+              plantResults: List<Map<String, dynamic>>.from(plantInfo['suggestions']),
+            ),
+          ),
+        );
+      } catch (e) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('식물 식별 중 오류가 발생했습니다: $e')),
+        );
+      }
     }
   }
 
@@ -24,37 +58,29 @@ class PlantRegistrationPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              'Register the photo of your plant!\nYou can take a picture with the camera or select from the gallery.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18),
-            ),
-            SizedBox(height: 20),
-            Text(
               '카메라로 식물을 촬영하거나, 갤러리에서 식물의 사진을 선택하여\n당신의 반려식물을 등록하세요!',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 18),
             ),
             SizedBox(height: 40),
             ElevatedButton.icon(
-              onPressed: _takePhoto, // 카메라로 사진 촬영 기능 추가
+              onPressed: () => _processImage(ImageSource.camera),
               icon: Icon(Icons.camera_alt),
-              label: Text('Take a photo of your plant'),
+              label: Text('식물 사진 촬영하기'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green, // 'primary'를 'backgroundColor'로 변경
-                foregroundColor: Colors.white, // 'onPrimary'를 'foregroundColor'로 변경
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
                 minimumSize: Size(double.infinity, 50),
               ),
             ),
             SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: () {
-                // 갤러리에서 사진 선택 기능 추가
-              },
+              onPressed: () => _processImage(ImageSource.gallery),
               icon: Icon(Icons.photo_library),
-              label: Text('Select photos from your phone'),
+              label: Text('갤러리에서 사진 선택하기'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green, // 'primary'를 'backgroundColor'로 변경
-                foregroundColor: Colors.white, // 'onPrimary'를 'foregroundColor'로 변경
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
                 minimumSize: Size(double.infinity, 50),
               ),
             ),
