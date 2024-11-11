@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../services/nongsaro_api_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class PlantDetailScreen extends StatefulWidget {
   final String plantName;
@@ -13,12 +15,15 @@ class PlantDetailScreen extends StatefulWidget {
 
   final bool showRegisterButton;
 
+  final String? scientificName;
+
   PlantDetailScreen({
     required this.plantName,
     required this.imagePath,
     this.probability,
     this.existingDetails,
     this.showRegisterButton = true,
+    this.scientificName,
   });
 
   @override
@@ -49,7 +54,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
 
   Future<void> _loadPlantDetails() async {
     try {
-      final details = await _apiService.getPlantDetails(widget.plantName);
+      final details = await _apiService.getPlantDetails(
+        widget.scientificName ?? widget.plantName
+      );
 
       setState(() {
         plantDetails = details;
@@ -77,52 +84,102 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     }
   }
 
+  Future<Map<String, String?>> getWikipediaInfo(String plantName) async {
+    try {
+      final enResponse = await http.get(
+        Uri.parse('https://en.wikipedia.org/api/rest_v1/page/summary/$plantName'),
+      );
+      
+      final krResponse = await http.get(
+        Uri.parse('https://ko.wikipedia.org/api/rest_v1/page/summary/$plantName'),
+      );
+      
+      Map<String, String?> result = {
+        'image': null,
+        'koreanName': null,
+      };
+      
+      if (enResponse.statusCode == 200) {
+        final enData = json.decode(enResponse.body);
+        result['image'] = enData['thumbnail']?['source'];
+      }
+      
+      if (krResponse.statusCode == 200) {
+        final krData = json.decode(krResponse.body);
+        result['koreanName'] = krData['title'];
+      }
+      
+      return result;
+    } catch (e) {
+      print('Wikipedia API 에러: $e');
+      return {'image': null, 'koreanName': null};
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(plantDetails?['koreanName'] ?? widget.plantName),
+        title: Text(
+          plantDetails?['koreanName'] ?? 
+          (widget.scientificName ?? widget.plantName),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.file(
-              File(widget.imagePath),
-              width: double.infinity,
-              height: 250,
-              fit: BoxFit.cover,
+            AspectRatio(
+              aspectRatio: 1,
+              child: plantDetails != null && plantDetails!['images'].isNotEmpty
+                  ? Image.network(
+                      plantDetails!['images'][0],
+                      fit: BoxFit.cover,
+                    )
+                  : FutureBuilder<Map<String, String?>>(
+                      future: getWikipediaInfo(widget.scientificName ?? widget.plantName),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data!['image'] != null) {
+                          return Image.network(
+                            snapshot.data!['image']!,
+                            fit: BoxFit.cover,
+                          );
+                        }
+                        return Image.file(
+                          File(widget.imagePath),
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    ),
             ),
-            _buildPlantInfo(),
-            if (widget.probability != null)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    minimumSize: Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context, {
-                      'name': widget.plantName,
-                      'imagePath': widget.imagePath,
-                      'probability': widget.probability,
-                      'details': plantDetails,
-                    });
-                  },
-                  child: Text(
-                    '식물 등록하기',
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 학명과 한글 이름 표시
+                  Text(
+                    widget.scientificName ?? widget.plantName,
                     style: TextStyle(
-                      color: Colors.white,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                ),
+                  if (plantDetails?['koreanName'] != null)
+                    Text(
+                      plantDetails!['koreanName'],
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  SizedBox(height: 16),
+                  _buildPlantInfo(),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -322,35 +379,6 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
             _buildSection('주의사항', [
               _buildInfoRow('독성', plantDetails!['toxicity']),
             ]),
-          if (widget.showRegisterButton)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  minimumSize: Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'name': widget.plantName,
-                    'imagePath': widget.imagePath,
-                    'probability': widget.probability,
-                    'details': plantDetails,
-                  });
-                },
-                child: Text(
-                  '식물 등록하기',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

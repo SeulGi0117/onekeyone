@@ -9,58 +9,94 @@ class NongsaroApiService {
 
   Future<Map<String, dynamic>?> getPlantDetails(String scientificName) async {
     try {
-      // 1. 식물 검색
-
-      final cntntsNo = await _searchPlant(scientificName);
+      // 1. 식물 검색 - 여러 검색 방법 시도
+      String? cntntsNo;
+      
+      // 학명으로 검색
+      cntntsNo = await _searchPlant(scientificName, 'plntzrNm');
+      
+      // 학명으로 검색 실패시 영문명으로 검색
+      if (cntntsNo == null) {
+        cntntsNo = await _searchPlant(scientificName, 'plntbneNm');
+      }
 
       if (cntntsNo == null) return null;
 
       // 2. 상세 정보 조회
-
       final details = await _getPlantDetail(cntntsNo);
-
       if (details == null) return null;
 
       // 3. 이미지 URL 조회
-
       final images = await _getPlantImages(cntntsNo);
 
       // 4. 모든 정보 합치기
-
       return {
         ...details,
         'images': images,
       };
     } catch (e) {
       print('농사로 API 오류: $e');
-
       return null;
     }
   }
 
-  Future<String?> _searchPlant(String scientificName) async {
-    final params = {
-      'apiKey': apiKey,
+  Future<String?> _searchPlant(String searchText, String searchType) async {
+    try {
+      // 학명으로 검색
+      final scientificParams = {
+        'apiKey': apiKey,
+        'sType': 'plntzrNm',     // 학명으로 검색
+        'sText': searchText,
+        'wordType': 'cntntsSj',
+        'pageNo': '1',
+        'numOfRows': '10',
+      };
 
-      'sType': 'plntzrNm', // 학명으로 검색
+      var response = await http
+          .get(Uri.parse('$baseUrl/gardenList?${_buildQueryString(scientificParams)}'));
 
-      'sText': scientificName,
-    };
+      if (response.statusCode == 200) {
+        final document = XmlDocument.parse(response.body);
+        final items = document.findAllElements('item');
 
-    final response = await http
-        .get(Uri.parse('$baseUrl/gardenList?${_buildQueryString(params)}'));
+        // 정확한 매칭 찾기
+        for (var item in items) {
+          final itemName = _getElementText(item, 'plntzrNm');
+          if (itemName.toLowerCase() == searchText.toLowerCase()) {
+            return _getElementText(item, 'cntntsNo');
+          }
+        }
 
-    if (response.statusCode == 200) {
-      final document = XmlDocument.parse(response.body);
+        // 한글 이름으로 검색
+        final koreanParams = {
+          'apiKey': apiKey,
+          'sType': 'sCntntsSj',
+          'sText': searchText,
+          'wordType': 'cntntsSj',
+          'pageNo': '1',
+          'numOfRows': '10',
+        };
 
-      final items = document.findAllElements('item');
+        response = await http
+            .get(Uri.parse('$baseUrl/gardenList?${_buildQueryString(koreanParams)}'));
 
-      if (items.isNotEmpty) {
-        return _getElementText(items.first, 'cntntsNo');
+        if (response.statusCode == 200) {
+          final document = XmlDocument.parse(response.body);
+          final items = document.findAllElements('item');
+
+          for (var item in items) {
+            final itemName = _getElementText(item, 'cntntsSj');
+            if (itemName.contains(searchText)) {
+              return _getElementText(item, 'cntntsNo');
+            }
+          }
+        }
       }
+      return null;
+    } catch (e) {
+      print('식물 검색 오류: $e');
+      return null;
     }
-
-    return null;
   }
 
   Future<Map<String, dynamic>?> _getPlantDetail(String cntntsNo) async {

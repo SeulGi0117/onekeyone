@@ -16,27 +16,41 @@ class PlantIdentificationService {
         'Content-Type': 'application/json'
       };
 
-      var request = http.Request('POST', Uri.parse(apiUrl));
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: headers,
+        body: json.encode({
+          "images": [base64Image],
+          "similar_images": true,
+          "classification_level": "species",
+          "health": "all"
+        }),
+      );
 
-      request.body = json.encode({
-        "images": ["data:image/jpeg;base64,$base64Image"],
-        "similar_images": true,
-        "classification_level": "species"
-      });
-
-      request.headers.addAll(headers);
-
-      var streamedResponse = await request.send();
-      var responseBody = await streamedResponse.stream.bytesToString();
-
-      if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
-        return json.decode(responseBody);
-      } else {
-        throw Exception('Plant.id API 오류: ${streamedResponse.statusCode}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final result = json.decode(response.body);
+        
+        if (result['result']?.containsKey('classification')) {
+          final suggestions = result['result']['classification']['suggestions'];
+          return {
+            'result': {
+              'classification': {
+                'suggestions': suggestions.map((suggestion) => {
+                  'name': suggestion['name'],
+                  'scientific_name': suggestion['name'],
+                  'probability': suggestion['probability'],
+                }).toList(),
+              }
+            }
+          };
+        }
       }
+      
+      print('Plant.id API 응답: ${response.body}');
+      throw Exception('Plant.id API 응답 오류: ${response.statusCode}');
     } catch (e) {
       print('식물 인식 중 오류 발생: $e');
-      throw Exception('식물 인식 실패: $e');
+      rethrow;
     }
   }
 }
