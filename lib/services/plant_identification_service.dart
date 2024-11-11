@@ -1,37 +1,42 @@
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 
 class PlantIdentificationService {
   final String apiKey = 'A5sz7vlrfVMKSPAvy1mooIpj4A4RZ4XoL77jQyfzVOAsdvqrIi';
-  final String apiUrl = 'https://api.plant.id/v2/identify';
+  final String apiUrl = 'https://plant.id/api/v3/identification';
 
   Future<Map<String, dynamic>> identifyPlant(String imagePath) async {
-    var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
-    request.headers.addAll({
-      'Content-Type': 'multipart/form-data',
-      'Api-Key': apiKey,
-    });
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final base64Image = base64Encode(bytes);
 
-    request.files.add(await http.MultipartFile.fromPath('images', imagePath));
-    request.fields['organs'] = 'leaf';
-    request.fields['include'] = 'common_names,taxonomy,description';
-
-    var response = await request.send();
-    if (response.statusCode == 200) {
-      var responseBody = await response.stream.bytesToString();
-      var decodedResponse = json.decode(responseBody);
-      return {
-        'suggestions': decodedResponse['suggestions'].map((suggestion) => {
-          'plant_name': suggestion['plant_name'],
-          'probability': suggestion['probability'],
-          'images': suggestion['similar_images'],
-          'taxonomy': suggestion['plant_details']['taxonomy'],
-          'description': suggestion['plant_details']['wiki_description']?['value'],
-        }).toList(),
+      var headers = {
+        'Api-Key': apiKey,
+        'Content-Type': 'application/json'
       };
-    } else {
-      throw Exception('Failed to identify plant');
+
+      var request = http.Request('POST', Uri.parse(apiUrl));
+
+      request.body = json.encode({
+        "images": ["data:image/jpeg;base64,$base64Image"],
+        "similar_images": true,
+        "classification_level": "species"
+      });
+
+      request.headers.addAll(headers);
+
+      var streamedResponse = await request.send();
+      var responseBody = await streamedResponse.stream.bytesToString();
+
+      if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
+        return json.decode(responseBody);
+      } else {
+        throw Exception('Plant.id API 오류: ${streamedResponse.statusCode}');
+      }
+    } catch (e) {
+      print('식물 인식 중 오류 발생: $e');
+      throw Exception('식물 인식 실패: $e');
     }
   }
 }
