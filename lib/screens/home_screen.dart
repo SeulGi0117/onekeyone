@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
 import 'plant_identification_screen.dart';
+import 'plant_detail_screen.dart';
 import 'dart:io';
+import '../models/plant.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final List<Plant> plants = [
+    Plant(
+      name: '테스트 식물',
+      imagePath: 'assets/images/default_plant.jpg',
+      temperature: '20-25',
+      humidity: '60-70',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -22,7 +38,8 @@ class HomeScreen extends StatelessWidget {
             child: ListView.builder(
               itemCount: plants.length, // plants는 등록된 식물 리스트
               itemBuilder: (context, index) {
-                return InkWell( // 터치 가능한 위젯으로 감싸기
+                return InkWell(
+                  // 터치 가능한 위젯으로 감싸기
                   onTap: () {
                     // 식물 상세 정보 화면으로 이동
                     Navigator.push(
@@ -49,7 +66,8 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                       title: Text(plants[index].name),
-                      subtitle: Text('온도: ${plants[index].temperature}°C\n습도: ${plants[index].humidity}% 필요'),
+                      subtitle: Text(
+                          '온도: ${plants[index].temperature}°C\n습도: ${plants[index].humidity}% 필요'),
                     ),
                   ),
                 );
@@ -58,7 +76,8 @@ class HomeScreen extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton.icon( // icon 추가
+            child: ElevatedButton.icon(
+              // icon 추가
               icon: Icon(Icons.add, color: Colors.white),
               label: Text(
                 '식물 등록하기',
