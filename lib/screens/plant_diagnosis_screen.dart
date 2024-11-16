@@ -30,57 +30,55 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('식물 건강 진단'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        titleTextStyle: TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.local_hospital,
-              size: 48,
-              color: Colors.green,
+    return Container(
+      width: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.local_hospital,
+            size: 64,
+            color: Colors.green,
+          ),
+          SizedBox(height: 24),
+          Text(
+            '식물 건강 진단',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
-            SizedBox(height: 16),
-            Text(
-              'AI가 당신의 식물의 건강 상태를\n진단해줘요!',
-              textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'AI가 당신의 식물의 건강 상태를\n진단해줘요!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: _takePicture,
+            icon: Icon(Icons.camera_alt, color: Colors.white),
+            label: Text(
+              '식물 잎 사진 촬영하기',
               style: TextStyle(
-                fontSize: 20,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
-            SizedBox(height: 32),
-            ElevatedButton.icon(
-              icon: Icon(Icons.camera_alt, color: Colors.white),
-              label: Text(
-                '식물 잎 사진 촬영하기',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-              onPressed: _takePicture,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

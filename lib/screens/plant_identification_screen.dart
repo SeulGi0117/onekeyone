@@ -5,6 +5,9 @@ import '../services/plant_identification_service.dart';
 import '../screens/plant_detail_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_database/firebase_database.dart';
+import '../services/database_service.dart';
+import '../services/nongsaro_api_service.dart';
 
 class PlantIdentificationScreen extends StatefulWidget {
   @override
@@ -14,6 +17,8 @@ class PlantIdentificationScreen extends StatefulWidget {
 
 class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
   final ImagePicker _picker = ImagePicker();
+  final DatabaseService _databaseService = DatabaseService();
+  final NongsaroApiService _apiService = NongsaroApiService();
 
   String? selectedImagePath;
 
@@ -136,6 +141,37 @@ class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
     } catch (e) {
       print('Wikipedia API 에러: $e');
       return {'image': null, 'koreanName': null};
+    }
+  }
+
+  Future<void> _registerPlant(Map<String, dynamic> plantData) async {
+    try {
+      // 식물 정보를 Firebase에 저장
+      await _databaseService.addPlant({
+        'name': plantData['name'],
+        'scientificName': plantData['name'], // Plant.id는 학명을 반환합니다
+        'imagePath': plantData['imagePath'],
+        'probability': plantData['probability'],
+        'registeredAt': DateTime.now().toIso8601String(),
+        'lastWatered': DateTime.now().toIso8601String(),
+        'wateringInterval': 7, // 기본값으로 7일 설정
+        'status': 'healthy',
+      });
+
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('식물이 성공적으로 등록되었습니다!')),
+      );
+
+      Navigator.pop(context, plantData);
+    } catch (e) {
+      print('식물 등록 오류: $e');
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('식물 등록 중 오류가 발생했습니다.')),
+      );
     }
   }
 
@@ -292,7 +328,7 @@ class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
                                           style: TextStyle(color: Colors.white),
                                         ),
                                         onPressed: () {
-                                          Navigator.pop(context, {
+                                          _registerPlant({
                                             'name': result['name'],
                                             'imagePath': selectedImagePath,
                                             'probability': result['probability'].toString(),
