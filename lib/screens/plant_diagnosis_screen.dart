@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'dart:io';
 
 class PlantDiagnosisScreen extends StatefulWidget {
@@ -9,7 +10,22 @@ class PlantDiagnosisScreen extends StatefulWidget {
 
 class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
   final ImagePicker _picker = ImagePicker();
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
   String? selectedImagePath;
+
+  Future<void> _clearPreviousDiagnosis() async {
+    try {
+      // plants/leaf_disease 경로의 모든 데이터를 가져옴
+      DataSnapshot snapshot = await _database.child('plants/leaf_disease').get();
+      
+      // 데이터가 있으면 삭제
+      if (snapshot.exists) {
+        await _database.child('plants/leaf_disease').remove();
+      }
+    } catch (e) {
+      print('기존 진단 데이터 삭제 오류: $e');
+    }
+  }
 
   Future<void> _takePicture() async {
     try {
@@ -18,6 +34,24 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
         setState(() {
           selectedImagePath = photo.path;
         });
+
+        // 기존 진단 데이터 삭제
+        await _clearPreviousDiagnosis();
+
+        // Firebase에 저장할 데이터 준비
+        Map<String, dynamic> diagnosisData = {
+          'imagePath': photo.path,
+          'timestamp': DateTime.now().toIso8601String(),
+          'status': 'pending',
+        };
+
+        // 새로운 데이터 저장
+        await _database.child('plants/leaf_disease').push().set(diagnosisData);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('식물 잎 사진이 업로드되었습니다')),
+        );
+
         // TODO: 여기에 식물 건강 진단 API 연동
       }
     } catch (e) {

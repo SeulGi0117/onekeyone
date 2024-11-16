@@ -270,9 +270,15 @@ class _HomeScreenState extends State<HomeScreen> {
     return PlantDiagnosisScreen();
   }
 
-  String _formatDate(String? dateString) {
-    if (dateString == null) return '정보 없음';
-    final date = DateTime.parse(dateString);
-    return '${date.year}-${date.month}-${date.day}';
+  String _formatDate(dynamic dateString) {
+    if (dateString == null || dateString.toString().isEmpty) {
+      return '정보 없음';
+    }
+    try {
+      final date = DateTime.parse(dateString.toString());
+      return '${date.year}-${date.month}-${date.day}';
+    } catch (e) {
+      return '정보 없음';
+    }
   }
 }
