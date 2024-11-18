@@ -15,12 +15,12 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
 
   Future<void> _clearPreviousDiagnosis() async {
     try {
-      // plants/leaf_disease 경로의 모든 데이터를 가져옴
-      DataSnapshot snapshot = await _database.child('plants/leaf_disease').get();
+      // leaf_disease 경로의 모든 데이터를 가져옴
+      DataSnapshot snapshot = await _database.child('leaf_disease').get();
       
       // 데이터가 있으면 삭제
       if (snapshot.exists) {
-        await _database.child('plants/leaf_disease').remove();
+        await _database.child('leaf_disease').remove();
       }
     } catch (e) {
       print('기존 진단 데이터 삭제 오류: $e');
@@ -45,8 +45,8 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
           'status': 'pending',
         };
 
-        // 새로운 데이터 저장
-        await _database.child('plants/leaf_disease').push().set(diagnosisData);
+        // 새로운 데이터 저장 (경로 수정)
+        await _database.child('leaf_disease').push().set(diagnosisData);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('식물 잎 사진이 업로드되었습니다')),
