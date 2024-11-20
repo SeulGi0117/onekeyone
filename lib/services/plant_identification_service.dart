@@ -28,6 +28,10 @@ class PlantIdentificationService {
         }),
       );
 
+      if (response.statusCode == 429) {
+        throw Exception('API 호출 한도가 초과되었습니다. 나중에 다시 시도해주세요.');
+      }
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final result = json.decode(response.body);
         
@@ -48,7 +52,7 @@ class PlantIdentificationService {
       }
       
       print('Plant.id API 응답: ${response.body}');
-      throw Exception('Plant.id API 응답 오류: ${response.statusCode}');
+      throw Exception('식물 인식에 실패했습니다. 다시 시도해주세요.');
     } catch (e) {
       print('식물 인식 중 오류 발생: $e');
       rethrow;

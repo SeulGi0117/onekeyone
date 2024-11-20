@@ -20,18 +20,101 @@ class PlantStatusScreen extends StatefulWidget {
 }
 
 class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTickerProviderStateMixin {
-  late final Stream<DatabaseEvent> _sensorStream;
   late final TabController _tabController;
   bool _isDisposed = false;
+  String? _nickname;
+  
+  // Stream을 broadcast로 변환하여 여러 번 구독 가능하게 함
+  late final Stream<DatabaseEvent> _sensorStream;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Stream을 broadcast로 변환
     _sensorStream = FirebaseDatabase.instance
         .ref()
         .child('JSON/ESP32SENSOR')
-        .onValue;
+        .onValue
+        .asBroadcastStream();
+    _nickname = widget.plant['nickname'];
+  }
+
+  void _editNickname() {
+    TextEditingController controller = TextEditingController(text: _nickname);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('식물 별명 설정'),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: '식물의 별명을 입력해주세요',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newNickname = controller.text.trim();
+              if (newNickname.isNotEmpty) {
+                try {
+                  // widget.plant에서 id를 직접 가져오는 대신 안전하게 처리
+                  final plantId = widget.plant['id']?.toString();
+                  if (plantId == null || plantId.isEmpty) {
+                    throw Exception('식물 ID를 찾을 수 없습니다');
+                  }
+
+                  // 파이어베이스 레퍼런스 생성
+                  final plantRef = FirebaseDatabase.instance
+                      .ref()
+                      .child('plants')
+                      .child(plantId);
+                  
+                  // 현재 데이터를 가져와서 nickname만 업데이트
+                  final snapshot = await plantRef.get();
+                  if (snapshot.exists) {
+                    final plantData = Map<String, dynamic>.from(snapshot.value as Map);
+                    plantData['nickname'] = newNickname;
+                    
+                    // 전체 데이터 업데이트
+                    await plantRef.update(plantData);
+                    
+                    setState(() {
+                      _nickname = newNickname;
+                    });
+                    
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('식물 별명이 변경되었습니다'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else {
+                    throw Exception('식물 데이터를 찾을 수 없습니다');
+                  }
+                } catch (e) {
+                  print('닉네임 저장 오류: $e');
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('별명 저장에 실패했습니다'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('저장'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -47,7 +130,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.plant['name']),
+          title: Text(_nickname ?? widget.plant['name']),
           bottom: TabBar(
             controller: _tabController,
             tabs: [
@@ -75,7 +158,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
     
     return StreamBuilder<DatabaseEvent>(
       key: ValueKey('realtime_data_stream'),
-      stream: _sensorStream,
+      stream: _sensorStream,  // broadcast stream 사용
       builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
         if (_isDisposed) return Container();
 
@@ -112,13 +195,44 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
               ),
               SizedBox(height: 20),
               
-              // 식물 이름
-              Text(
-                widget.plant['name'],
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+              // 식물 이름과 별명 설정 버튼
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.plant['name'],
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: _editNickname,
+                          child: Row(
+                            children: [
+                              Text(
+                                _nickname != null ? _nickname! : '식물 별명 추가하기',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(
+                                Icons.edit,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 20),
 
@@ -205,6 +319,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
       future: _apiService.getPlantDetails(
         widget.plant['name'],
         scientificName: widget.plant['scientificName'],
+        englishName: widget.plant['englishName'],
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -215,9 +330,42 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
           return Center(child: Text('식물 정보를 불러오는데 실패했습니다.'));
         }
 
-        final plantDetails = snapshot.data;
-        if (plantDetails == null) {
-          return Center(child: Text('식물 정보를 찾을 수 없습니다.'));
+        final plantDetails = snapshot.data ?? {
+          'koreanName': '-',
+          'scientificName': '-',
+          'englishName': '-',
+          'familyName': '-',
+          'origin': '-',
+          'growthHeight': '-',
+          'growthWidth': '-',
+          'leafInfo': '-',
+          'flowerInfo': '-',
+          'managementLevel': '-',
+          'lightDemand': '-',
+          'waterCycle': {
+            'spring': '-',
+            'summer': '-',
+            'autumn': '-',
+            'winter': '-',
+          },
+          'temperature': {
+            'growth': '-',
+            'winter': '-',
+          },
+          'humidity': '-',
+          'specialManagement': '-',
+          'toxicity': '-',
+        };
+
+        if (snapshot.data == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('식물 정보를 찾을 수 없습니다.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          });
         }
 
         return SingleChildScrollView(
@@ -231,38 +379,28 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
               ),
               SizedBox(height: 16),
               _buildInfoSection('식물명', [
-                _buildInfoRow('한글명', plantDetails['koreanName'] ?? '-'),
-                _buildInfoRow('영문명', plantDetails['englishName'] ?? '-'),
-                _buildInfoRow('학명', plantDetails['scientificName'] ?? '-'),
-                _buildInfoRow('과명', plantDetails['familyName'] ?? '-'),
+                _buildInfoRow('한글명', plantDetails['koreanName']),
+                _buildInfoRow('영문명', plantDetails['englishName']),
+                _buildInfoRow('학명', plantDetails['scientificName']),
+                _buildInfoRow('과명', plantDetails['familyName']),
               ]),
-              
-              _buildInfoSection('생육 정보', [
-                _buildInfoRow('성장 높이', plantDetails['growthHeight'] ?? '-'),
-                _buildInfoRow('성장 넓이', plantDetails['growthWidth'] ?? '-'),
-                _buildInfoRow('생육 온도', plantDetails['temperature']?['growth'] ?? '-'),
-                _buildInfoRow('겨울 최저온도', plantDetails['temperature']?['winter'] ?? '-'),
+              _buildInfoSection('식물 특성', [
+                _buildInfoRow('원산지', plantDetails['origin']),
+                _buildInfoRow('성장 높이', plantDetails['growthHeight']),
+                _buildInfoRow('성장 너비', plantDetails['growthWidth']),
+                _buildInfoRow('잎 정보', plantDetails['leafInfo']),
+                _buildInfoRow('꽃 정보', plantDetails['flowerInfo']),
               ]),
-              
-              _buildInfoSection('관리 방법', [
-                _buildInfoRow('관리 난이도', plantDetails['managementLevel'] ?? '-'),
-                _buildInfoRow('물주기(봄)', plantDetails['waterCycle']?['spring'] ?? '-'),
-                _buildInfoRow('물주기(여름)', plantDetails['waterCycle']?['summer'] ?? '-'),
-                _buildInfoRow('물주기(가을)', plantDetails['waterCycle']?['autumn'] ?? '-'),
-                _buildInfoRow('물주기(겨울)', plantDetails['waterCycle']?['winter'] ?? '-'),
-                _buildInfoRow('빛 요구도', plantDetails['lightDemand'] ?? '-'),
-                _buildInfoRow('습도', plantDetails['humidity'] ?? '-'),
+              _buildInfoSection('관리 정보', [
+                _buildInfoRow('관리 수준', plantDetails['managementLevel']),
+                _buildInfoRow('광 요구도', plantDetails['lightDemand']),
+                _buildInfoRow('물 주기', '봄: ${plantDetails['waterCycle']['spring']}, 여름: ${plantDetails['waterCycle']['summer']}, 가을: ${plantDetails['waterCycle']['autumn']}, 겨울: ${plantDetails['waterCycle']['winter']}'),
+                _buildInfoRow('성장 온도', plantDetails['temperature']['growth']),
+                _buildInfoRow('겨울 온도', plantDetails['temperature']['winter']),
+                _buildInfoRow('습도', plantDetails['humidity']),
+                _buildInfoRow('특별 관리', plantDetails['specialManagement']),
+                _buildInfoRow('독성 정보', plantDetails['toxicity']),
               ]),
-
-              if (plantDetails['specialManagement']?.isNotEmpty ?? false)
-                _buildInfoSection('특별 관리', [
-                  Text(plantDetails['specialManagement']),
-                ]),
-
-              if (plantDetails['toxicity']?.isNotEmpty ?? false)
-                _buildInfoSection('독성 정보', [
-                  Text(plantDetails['toxicity']),
-                ]),
             ],
           ),
         );
@@ -406,7 +544,11 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
 
     return StreamBuilder<DatabaseEvent>(
       key: ValueKey('camera_stream'),
-      stream: FirebaseDatabase.instance.ref().child('JSON/ESP32CAM').onValue,
+      stream: FirebaseDatabase.instance
+          .ref()
+          .child('JSON/ESP32CAM')
+          .onValue
+          .asBroadcastStream(),
       builder: (context, snapshot) {
         if (_isDisposed) return Container();
 

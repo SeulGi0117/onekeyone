@@ -4,8 +4,61 @@ import 'screens/home_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
-  await dotenv.load(fileName: ".env");  // .env 파일 로드
-  runApp(MyApp());
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // .env 파일 로드
+    await dotenv.load(fileName: ".env");
+    print("환경변수 로드 성공"); // 디버깅용
+    
+    // Firebase 초기화
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
+        appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
+        projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
+        databaseURL: dotenv.env['FIREBASE_DATABASE_URL'] ?? '',
+      ),
+    );
+    print("Firebase 초기화 성공"); // 디버깅용
+    
+    runApp(MyApp());
+  } catch (e) {
+    print("초기화 중 에러 발생: $e"); // 디버깅용
+    runApp(ErrorApp(error: e.toString())); // 에러 화면 표시
+  }
+}
+
+// 에러 표시용 위젯
+class ErrorApp extends StatelessWidget {
+  final String error;
+  
+  const ErrorApp({Key? key, required this.error}) : super(key: key);
+  
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '앱 초기화 중 오류가 발생했습니다',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 16),
+                Text(error, style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {

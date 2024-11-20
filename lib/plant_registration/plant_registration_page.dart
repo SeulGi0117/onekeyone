@@ -60,7 +60,9 @@ class _PlantRegistrationPageState extends State<PlantRegistrationPage> {
             Text(
               '카메라로 식물을 촬영하거나, 갤러리에서 식물의 사진을 선택하여\n당신의 반려식물을 등록하세요!',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18),
+              style: const TextStyle(
+                fontSize: 18,
+              ),
             ),
             SizedBox(height: 40),
             ElevatedButton.icon(
