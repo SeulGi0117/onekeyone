@@ -1,9 +1,10 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PlantIdentificationService {
-  final String apiKey = 'A5sz7vlrfVMKSPAvy1mooIpj4A4RZ4XoL77jQyfzVOAsdvqrIi';
+  final String apiKey = dotenv.env['PLANT_ID_API_KEY'] ?? '';
   final String apiUrl = 'https://plant.id/api/v3/identification';
 
   Future<Map<String, dynamic>> identifyPlant(String imagePath) async {

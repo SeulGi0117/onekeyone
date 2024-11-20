@@ -1,168 +1,110 @@
 import 'package:http/http.dart' as http;
-
 import 'package:xml/xml.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class NongsaroApiService {
-  final String apiKey = '202410172YV65RKGC1W4ZMWO94TG';
-
+  final String apiKey = dotenv.env['NONGSARO_API_KEY'] ?? '';
   final String baseUrl = 'http://api.nongsaro.go.kr/service/garden';
 
-  Future<Map<String, dynamic>?> getPlantDetails(String scientificName) async {
+  Future<Map<String, dynamic>?> getPlantDetails(String plantName, {String? scientificName}) async {
     try {
-      // 1. 식물 검색 - 여러 검색 방법 시도
-      String? cntntsNo;
+      // 1. 먼저 한글 이름으로 검색
+      Map<String, dynamic>? result = await _searchPlant(plantName);
       
-      // 학명으로 검색
-      cntntsNo = await _searchPlant(scientificName, 'plntzrNm');
-      
-      // 학명으로 검색 실패시 영문명으로 검색
-      if (cntntsNo == null) {
-        cntntsNo = await _searchPlant(scientificName, 'plntbneNm');
+      // 2. 한글 이름으로 검색 실패시 학명으로 검색
+      if (result == null && scientificName != null) {
+        result = await _searchPlant(scientificName);
       }
 
-      if (cntntsNo == null) return null;
-
-      // 2. 상세 정보 조회
-      final details = await _getPlantDetail(cntntsNo);
-      if (details == null) return null;
-
-      // 3. 이미지 URL 조회
-      final images = await _getPlantImages(cntntsNo);
-
-      // 4. 모든 정보 합치기
-      return {
-        ...details,
-        'images': images,
-      };
+      return result;
     } catch (e) {
       print('농사로 API 오류: $e');
       return null;
     }
   }
 
-  Future<String?> _searchPlant(String searchText, String searchType) async {
+  Future<Map<String, dynamic>?> _searchPlant(String searchText) async {
     try {
-      // 학명으로 검색
-      final scientificParams = {
+      final searchParams = {
         'apiKey': apiKey,
-        'sType': 'plntzrNm',     // 학명으로 검색
         'sText': searchText,
-        'wordType': 'cntntsSj',
         'pageNo': '1',
         'numOfRows': '10',
       };
 
-      var response = await http
-          .get(Uri.parse('$baseUrl/gardenList?${_buildQueryString(scientificParams)}'));
+      // 한글 이름과 학명 모두로 검색
+      final searchResponse = await http.get(
+        Uri.parse('$baseUrl/gardenList?${_buildQueryString(searchParams)}')
+      );
 
-      if (response.statusCode == 200) {
-        final document = XmlDocument.parse(response.body);
-        final items = document.findAllElements('item');
+      if (searchResponse.statusCode != 200) {
+        throw Exception('식물 검색 실패');
+      }
 
-        // 정확한 매칭 찾기
-        for (var item in items) {
-          final itemName = _getElementText(item, 'plntzrNm');
-          if (itemName.toLowerCase() == searchText.toLowerCase()) {
-            return _getElementText(item, 'cntntsNo');
-          }
-        }
-
-        // 한글 이름으로 검색
-        final koreanParams = {
-          'apiKey': apiKey,
-          'sType': 'sCntntsSj',
-          'sText': searchText,
-          'wordType': 'cntntsSj',
-          'pageNo': '1',
-          'numOfRows': '10',
-        };
-
-        response = await http
-            .get(Uri.parse('$baseUrl/gardenList?${_buildQueryString(koreanParams)}'));
-
-        if (response.statusCode == 200) {
-          final document = XmlDocument.parse(response.body);
-          final items = document.findAllElements('item');
-
-          for (var item in items) {
-            final itemName = _getElementText(item, 'cntntsSj');
-            if (itemName.contains(searchText)) {
-              return _getElementText(item, 'cntntsNo');
-            }
-          }
+      final searchDocument = XmlDocument.parse(searchResponse.body);
+      final items = searchDocument.findAllElements('item');
+      
+      String? cntntsNo;
+      for (var item in items) {
+        final itemName = _getElementText(item, 'cntntsSj');
+        final itemScientificName = _getElementText(item, 'plntzrNm');
+        
+        // 한글 이름이나 학명이 일치하는 경우
+        if (itemName.contains(searchText) || itemScientificName.contains(searchText)) {
+          cntntsNo = _getElementText(item, 'cntntsNo');
+          break;
         }
       }
-      return null;
+
+      if (cntntsNo == null) return null;
+
+      // 상세 정보 조회
+      final detailParams = {
+        'apiKey': apiKey,
+        'cntntsNo': cntntsNo,
+      };
+
+      final detailResponse = await http.get(
+        Uri.parse('$baseUrl/gardenDtl?${_buildQueryString(detailParams)}')
+      );
+
+      if (detailResponse.statusCode != 200) {
+        throw Exception('상세 정보 조회 실패');
+      }
+
+      final detailDocument = XmlDocument.parse(detailResponse.body);
+      final detailItem = detailDocument.findAllElements('item').first;
+
+      return {
+        'koreanName': _getElementText(detailItem, 'cntntsSj'),
+        'scientificName': _getElementText(detailItem, 'plntzrNm'),
+        'englishName': _getElementText(detailItem, 'plntbneNm'),
+        'familyName': _getElementText(detailItem, 'fmlCodeNm'),
+        'origin': _getElementText(detailItem, 'orgplceInfo'),
+        'growthHeight': _getElementText(detailItem, 'growthHgInfo'),
+        'growthWidth': _getElementText(detailItem, 'growthAraInfo'),
+        'leafInfo': _getElementText(detailItem, 'lefStleInfo'),
+        'flowerInfo': _getElementText(detailItem, 'flwrInfo'),
+        'managementLevel': _getElementText(detailItem, 'managelevelCodeNm'),
+        'lightDemand': _getElementText(detailItem, 'lighttdemanddoCodeNm'),
+        'waterCycle': {
+          'spring': _getElementText(detailItem, 'watercycleSprngCodeNm'),
+          'summer': _getElementText(detailItem, 'watercycleSummerCodeNm'),
+          'autumn': _getElementText(detailItem, 'watercycleAutumnCodeNm'),
+          'winter': _getElementText(detailItem, 'watercycleWinterCodeNm'),
+        },
+        'temperature': {
+          'growth': _getElementText(detailItem, 'grwhTpCodeNm'),
+          'winter': _getElementText(detailItem, 'winterLwetTpCodeNm'),
+        },
+        'humidity': _getElementText(detailItem, 'hdCodeNm'),
+        'specialManagement': _getElementText(detailItem, 'speclmanageInfo'),
+        'toxicity': _getElementText(detailItem, 'toxctyInfo'),
+      };
     } catch (e) {
       print('식물 검색 오류: $e');
       return null;
     }
-  }
-
-  Future<Map<String, dynamic>?> _getPlantDetail(String cntntsNo) async {
-    final params = {
-      'apiKey': apiKey,
-      'cntntsNo': cntntsNo,
-    };
-
-    final response = await http
-        .get(Uri.parse('$baseUrl/gardenDtl?${_buildQueryString(params)}'));
-
-    if (response.statusCode == 200) {
-      final document = XmlDocument.parse(response.body);
-
-      final item = document.findAllElements('item').first;
-
-      return {
-        'koreanName': _getElementText(item, 'cntntsSj'),
-        'scientificName': _getElementText(item, 'plntzrNm'),
-        'familyName': _getElementText(item, 'fmlCodeNm'),
-        'englishName': _getElementText(item, 'plntbneNm'),
-        'description': _getElementText(item, 'adviseInfo'),
-        'origin': _getElementText(item, 'orgplceInfo'),
-        'growthHeight': _getElementText(item, 'growthHgInfo'),
-        'growthWidth': _getElementText(item, 'growthAraInfo'),
-        'leafInfo': _getElementText(item, 'lefStleInfo'),
-        'flowerInfo': _getElementText(item, 'flwrInfo'),
-        'managementLevel': _getElementText(item, 'managelevelCodeNm'),
-        'lightDemand': _getElementText(item, 'lighttdemanddoCodeNm'),
-        'waterCycle': {
-          'spring': _getElementText(item, 'watercycleSprngCodeNm'),
-          'summer': _getElementText(item, 'watercycleSummerCodeNm'),
-          'autumn': _getElementText(item, 'watercycleAutumnCodeNm'),
-          'winter': _getElementText(item, 'watercycleWinterCodeNm'),
-        },
-        'temperature': {
-          'growth': _getElementText(item, 'grwhTpCodeNm'),
-          'winter': _getElementText(item, 'winterLwetTpCodeNm'),
-        },
-        'humidity': _getElementText(item, 'hdCodeNm'),
-        'specialManagement': _getElementText(item, 'speclmanageInfo'),
-        'toxicity': _getElementText(item, 'toxctyInfo'),
-      };
-    }
-
-    return null;
-  }
-
-  Future<List<String>> _getPlantImages(String cntntsNo) async {
-    final params = {
-      'apiKey': apiKey,
-      'cntntsNo': cntntsNo,
-    };
-
-    final response = await http
-        .get(Uri.parse('$baseUrl/gardenFileList?${_buildQueryString(params)}'));
-
-    if (response.statusCode == 200) {
-      final document = XmlDocument.parse(response.body);
-
-      final items = document.findAllElements('item');
-
-      return items.map((item) => _getElementText(item, 'rtnFileUrl')).toList();
-    }
-
-    return [];
   }
 
   String _buildQueryString(Map<String, String> params) {
