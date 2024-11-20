@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'plant_identification_screen.dart';
-import 'plant_detail_screen.dart';
 import 'plant_diagnosis_screen.dart';
 import 'dart:io';
-import '../models/plant.dart';
 import '../services/nongsaro_api_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../services/database_service.dart';
@@ -13,7 +11,7 @@ class HomeScreen extends StatefulWidget {
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
- 
+
 class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final NongsaroApiService _apiService = NongsaroApiService();
@@ -31,7 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _selectedIndex == 0 ? _buildHomeScreen() : _buildDiagnosisScreen(),
+            child: _selectedIndex == 0
+                ? _buildHomeScreen()
+                : _buildDiagnosisScreen(),
           ),
           if (_selectedIndex == 0)
             Container(
@@ -112,153 +112,196 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        Map<dynamic, dynamic> plants = 
+        Map<dynamic, dynamic> plants =
             snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
 
-        return ListView.builder(
-          itemCount: plants.length,
-          itemBuilder: (context, index) {
-            String key = plants.keys.elementAt(index);
-            Map<dynamic, dynamic> plant = plants[key];
+        return StreamBuilder(
+          stream: FirebaseDatabase.instance.ref().child('JSON/ESP32SENSOR').onValue,
+          builder: (context, AsyncSnapshot<DatabaseEvent> sensorSnapshot) {
+            Map<String, dynamic> sensorData = {};
             
-            return Card(
-              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: InkWell(
-                onTap: () {
-                  Map<String, dynamic> plantData = Map<String, dynamic>.from(plant);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PlantStatusScreen(plant: plantData),
-                    ),
-                  );
-                },
-                child: ListTile(
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      File(plant['imagePath']),
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  title: Text(
-                    plant['name'],
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.water_drop, size: 16, color: Colors.blue),
-                            SizedBox(width: 4),
-                            Text('마지막 물주기: ${_formatDate(plant['lastWatered'])}'),
-                          ],
+            if (sensorSnapshot.hasData && sensorSnapshot.data?.snapshot.value != null) {
+              sensorData = Map<String, dynamic>.from(
+                  sensorSnapshot.data!.snapshot.value as Map);
+            }
+
+            return ListView.builder(
+              itemCount: plants.length,
+              itemBuilder: (context, index) {
+                String key = plants.keys.elementAt(index);
+                Map<dynamic, dynamic> plant = plants[key];
+
+                return Card(
+                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: InkWell(
+                    onTap: () {
+                      Map<String, dynamic> plantData =
+                          Map<String, dynamic>.from(plant);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PlantStatusScreen(
+                            plant: plantData,
+                            sensorData: sensorData,
+                          ),
                         ),
-                        SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.favorite, size: 16, color: Colors.green),
-                            SizedBox(width: 4),
-                            Text('상태: ${plant['status']}'),
-                          ],
+                      );
+                    },
+                    child: ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(plant['imagePath']),
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
                         ),
-                        SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.thermostat, size: 16, color: Colors.orange),
-                            SizedBox(width: 4),
-                            Text('온도: ${plant['temperature'] ?? '20-25'}°C'),
-                          ],
+                      ),
+                      title: Text(
+                        plant['name'],
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
-                        SizedBox(height: 4),
-                        Row(
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.opacity, size: 16, color: Colors.lightBlue),
-                            SizedBox(width: 4),
-                            Text('토양습도: ${plant['soilMoisture'] ?? '60-70'}%'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  trailing: PopupMenuButton(
-                    icon: Icon(Icons.more_vert),
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('식물 삭제하기', style: TextStyle(color: Colors.red)),
+                            Row(
+                              children: [
+                                Icon(Icons.water_drop,
+                                    size: 16, color: Colors.blue),
+                                SizedBox(width: 4),
+                                Text(
+                                    '마지막 물주기: ${_formatDate(plant['lastWatered'])}'),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.favorite,
+                                    size: 16, color: Colors.green),
+                                SizedBox(width: 4),
+                                Text('상태: ${plant['status']}'),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.thermostat,
+                                    size: 16, color: Colors.orange),
+                                SizedBox(width: 4),
+                                Text('온도: ${sensorData['온도'] ?? '측정중'}'),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.opacity,
+                                    size: 16, color: Colors.lightBlue),
+                                SizedBox(width: 4),
+                                Text('습도: ${sensorData['습도'] ?? '측정중'}'),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.wb_sunny,
+                                    size: 16, color: Colors.yellow),
+                                SizedBox(width: 4),
+                                Text('조도: ${sensorData['조도'] ?? '측정중'} lux'),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.water,
+                                    size: 16, color: Colors.blue),
+                                SizedBox(width: 4),
+                                Text('토양습도: ${sensorData['토양습도'] ?? '측정중'}%'),
+                              ],
+                            ),
                           ],
                         ),
                       ),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AlertDialog(
-                              title: Text('식물 삭제'),
-                              content: Text('정말로 등록된 ${plant['name']}을(를) 삭제하시겠습니까?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: Text(
-                                    '아니요',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () async {
-                                    await _databaseService.deletePlant(key);
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('${plant['name']}이(가) 삭제되었습니다'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    elevation: 0,
-                                  ),
-                                  child: Text(
-                                    '삭제합니다',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
+                      trailing: PopupMenuButton(
+                        icon: Icon(Icons.more_vert),
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('식물 삭제하기',
+                                    style: TextStyle(color: Colors.red)),
                               ],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                          ),
+                        ],
+                        onSelected: (value) {
+                          if (value == 'delete') {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: Text('식물 삭제'),
+                                  content: Text(
+                                      '정말로 등록된 ${plant['name']}을(를) 삭제하시겠습니까?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: Text(
+                                        '아니요',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await _databaseService.deletePlant(key);
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                '${plant['name']}이(가) 삭제되었습니다'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        elevation: 0,
+                                      ),
+                                      child: Text(
+                                        '삭제합니다',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  actionsPadding: EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                );
+                              },
                             );
-                          },
-                        );
-                      }
-                    },
+                          }
+                        },
+                      ),
+                      contentPadding: EdgeInsets.all(12),
+                    ),
                   ),
-                  contentPadding: EdgeInsets.all(12),
-                ),
-              ),
+                );
+              },
             );
           },
         );

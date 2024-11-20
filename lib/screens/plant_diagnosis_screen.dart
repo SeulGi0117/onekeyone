@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:io';
+import 'dart:convert';
 
 class PlantDiagnosisScreen extends StatefulWidget {
   @override
@@ -17,7 +18,7 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
     try {
       // leaf_disease 경로의 모든 데이터를 가져옴
       DataSnapshot snapshot = await _database.child('leaf_disease').get();
-      
+
       // 데이터가 있으면 삭제
       if (snapshot.exists) {
         await _database.child('leaf_disease').remove();
@@ -35,18 +36,25 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
           selectedImagePath = photo.path;
         });
 
+        // 이미지 파일을 base64로 인코딩
+        final bytes = await File(photo.path).readAsBytes();
+        final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
         // 기존 진단 데이터 삭제
         await _clearPreviousDiagnosis();
 
         // Firebase에 저장할 데이터 준비
         Map<String, dynamic> diagnosisData = {
-          'imagePath': photo.path,
+          'imageBase64': base64Image, // base64로 인코딩된 이미지
+          'imagePath': photo.path, // 로컬 파일 경로도 함께 저장
           'timestamp': DateTime.now().toIso8601String(),
           'status': 'pending',
         };
 
-        // 새로운 데이터 저장 (경로 수정)
+        // 새로운 데이터 저장
         await _database.child('leaf_disease').push().set(diagnosisData);
+
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('식물 잎 사진이 업로드되었습니다')),
@@ -56,6 +64,8 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
       }
     } catch (e) {
       print('카메라 에러: $e');
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('사진 촬영 중 오류가 발생했습니다.')),
       );
@@ -116,4 +126,4 @@ class _PlantDiagnosisScreenState extends State<PlantDiagnosisScreen> {
       ),
     );
   }
-} 
+}
