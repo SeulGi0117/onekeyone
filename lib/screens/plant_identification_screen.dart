@@ -143,7 +143,7 @@ class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
       return {'image': null, 'koreanName': null};
     }
   }
-
+ 
   Future<void> _registerPlant(Map<String, dynamic> plantData) async {
     try {
       // 식물 정보를 Firebase에 저장
