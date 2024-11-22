@@ -7,6 +7,7 @@ import 'package:firebase_database/firebase_database.dart';
 import '../services/database_service.dart';
 import 'plant_status_screen.dart';
 import 'quest_screen.dart';
+import 'store_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectedIndex == 0 ? '내 식물' : '식물 진단'),
+        title: Text(_getAppBarTitle()),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -57,14 +58,52 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _selectedIndex == 0
-                ? _buildHomeScreen()
-                : _buildDiagnosisScreen(),
+      body: _buildBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: '내 식물',
           ),
-          if (_selectedIndex == 0)
+          BottomNavigationBarItem(
+            icon: Icon(Icons.healing),
+            label: '진단하기',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.store),
+            label: '스토어',
+          ),
+        ],
+        selectedItemColor: Colors.green,
+      ),
+    );
+  }
+
+  String _getAppBarTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return '내 식물';
+      case 1:
+        return '식물 진단';
+      case 2:
+        return '스토어';
+      default:
+        return '내 식물';
+    }
+  }
+
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return Column(
+          children: [
+            Expanded(child: _buildHomeScreen()),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -95,28 +134,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: '내 식물',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.healing),
-            label: '진단하기',
-          ),
-        ],
-        selectedItemColor: Colors.green,
-      ),
-    );
+          ],
+        );
+      case 1:
+        return _buildDiagnosisScreen();
+      case 2:
+        return const StoreScreen();
+      default:
+        return _buildHomeScreen();
+    }
   }
 
   Widget _buildHomeScreen() {

@@ -364,6 +364,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
               ),
               const SizedBox(height: 12),
               _buildCameraCard(),
+              const SizedBox(height: 12),
+              _buildGrowthReportCard(),
               const SizedBox(height: 20),
 
               // 식물 건강 상태 섹션
@@ -684,6 +686,348 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildGrowthReportCard() {
+    return Column(
+      children: [
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.note_alt, color: Colors.green),
+            title: const Text('성장 보고서'),
+            subtitle: const Text('식물의 성장 과정을 기록해보세요'),
+            onTap: () => _showGrowthReportDialog(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // 성장 보고서 일지 목록
+        StreamBuilder<DatabaseEvent>(
+          stream: FirebaseDatabase.instance
+              .ref()
+              .child('growth_reports')
+              .child(widget.plant['id'])
+              .child('reports')
+              .onValue,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+              return const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('아직 작성된 성장 보고서가 없습니다'),
+                ),
+              );
+            }
+
+            final reports =
+                Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
+            final sortedReports = reports.entries.toList()
+              ..sort((a, b) {
+                final dateA = DateTime.parse(a.value['date']);
+                final dateB = DateTime.parse(b.value['date']);
+                return dateB.compareTo(dateA); // 최신순 정렬
+              });
+
+            return Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '성장 일지',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...sortedReports.map((report) {
+                      final date = DateTime.parse(report.value['date']);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: InkWell(
+                          onTap: () => _showReportDetailDialog(
+                            Map<String, dynamic>.from(report.value),
+                            report.key,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          report.value['title'],
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${date.year}.${date.month}.${date.day} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red, size: 20),
+                                    onPressed: () => _deleteReport(report.key),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                report.value['content'],
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const Divider(),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // 성장 보고서 삭제 메서드 추가
+  void _deleteReport(String reportId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('성장 보고서 삭제'),
+        content: const Text('이 보고서를 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소', style: TextStyle(color: Colors.grey[600])),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await FirebaseDatabase.instance
+                    .ref()
+                    .child('growth_reports')
+                    .child(widget.plant['id'])
+                    .child('reports')
+                    .child(reportId)
+                    .remove();
+
+                if (!mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('성장 보고서가 삭제되었습니다'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } catch (e) {
+                print('보고서 삭제 오류: $e');
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // _showGrowthReportDialog 메서드 수정
+  void _showGrowthReportDialog(
+      {Map<String, dynamic>? existingReport, String? reportId}) {
+    final TextEditingController titleController =
+        TextEditingController(text: existingReport?['title'] ?? '');
+    final TextEditingController reportController =
+        TextEditingController(text: existingReport?['content'] ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(existingReport != null ? '성장 보고서 수정' : '성장 보고서 작성'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: '제목',
+                hintText: '제목을 입력해주세요',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reportController,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: '내용',
+                hintText: '식물의 성장 과정이나 특이사항을 기록해보세요',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              '취소',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                final title = titleController.text.trim();
+                final reportContent = reportController.text.trim();
+                if (title.isNotEmpty && reportContent.isNotEmpty) {
+                  final reportsRef = FirebaseDatabase.instance
+                      .ref()
+                      .child('growth_reports')
+                      .child(widget.plant['id'])
+                      .child('reports');
+
+                  if (existingReport != null && reportId != null) {
+                    // 기존 보고서 수정
+                    await reportsRef.child(reportId).update({
+                      'title': title,
+                      'content': reportContent,
+                      'lastEdited': DateTime.now().toIso8601String(),
+                    });
+                  } else {
+                    // 새 보고서 작성
+                    await reportsRef.push().set({
+                      'title': title,
+                      'content': reportContent,
+                      'date': DateTime.now().toIso8601String(),
+                    });
+
+                    // 성장 보고서 퀘스트 진행도 업데이트
+                    final questRef = FirebaseDatabase.instance
+                        .ref()
+                        .child('quests/growth_report');
+                    final questSnapshot = await questRef.get();
+
+                    if (questSnapshot.exists) {
+                      final questData =
+                          Map<String, dynamic>.from(questSnapshot.value as Map);
+                      final currentProgress = questData['progress'] ?? 0;
+                      final isRewarded = questData['rewarded'] ?? false;
+
+                      if (!isRewarded && currentProgress < 3) {
+                        await questRef.update({
+                          'progress': currentProgress + 1,
+                          'lastUpdate': DateTime.now().toIso8601String(),
+                        });
+                      }
+                    }
+                  }
+
+                  if (!mounted) return;
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(existingReport != null
+                          ? '성장 보고서가 수정되었습니다'
+                          : '성장 보고서가 저장되었습니다'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('제목과 내용을 모두 입력해주세요'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                print('성장 보고서 저장 오류: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('저장 중 오류가 발생했습니다'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+            ),
+            child: Text(existingReport != null ? '수정' : '저장'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 보고서 상세 내용을 보여주는 다이얼로그 수정
+  void _showReportDetailDialog(Map<String, dynamic> report, String reportId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(report['title']),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              DateTime.parse(report['date']).toString().substring(0, 16),
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+            if (report['lastEdited'] != null) ...[
+              Text(
+                '마지막 수정: ${DateTime.parse(report['lastEdited']).toString().substring(0, 16)}',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text(report['content']),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('닫기'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showGrowthReportDialog(
+                  existingReport: report, reportId: reportId);
+            },
+            child: const Text('수정', style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
     );
   }
 }

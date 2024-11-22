@@ -54,11 +54,13 @@ dependencies:
     sdk: flutter
   firebase_core: ^2.24.2
   firebase_database: ^10.4.0
+  firebase_storage: ^11.6.0
   image_picker: ^0.8.4+4
   http: ^0.13.3
   xml: ^6.3.0
   cupertino_icons: ^1.0.8
   flutter_dotenv: ^5.0.2
+  intl: ^0.18.1
 
 dev_dependencies:
   flutter_test:
@@ -84,8 +86,12 @@ dev_dependencies:
 
 flutter:
   assets:
-    - assets/images/logo.png
     - .env
+    # - assets\images\store_images\fertilizer.jpg
+    - assets\images/store_images/식물비료.jpg
+    - assets\images/store_images/식물영양제.jpg
+    - assets\images/store_images/식물키트.jpg
+    - assets\images/store_images/원예도구.jpg
 
   # The following line ensures that the Material Icons font is
 

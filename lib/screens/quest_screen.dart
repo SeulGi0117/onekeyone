@@ -170,9 +170,9 @@ class _QuestScreenState extends State<QuestScreen>
   final List<Map<String, dynamic>> dailyQuests = [
     {
       'title': '물주기 마스터',
-      'description': '식물에 물주기 1회 완료하기',
+      'description': '식물에 물주기 3회 완료하기',
       'progress': 0,
-      'goal': 1,
+      'goal': 3,
       'reward': 100,
       'icon': Icons.water_drop,
       'type': 'watering',
@@ -208,6 +208,16 @@ class _QuestScreenState extends State<QuestScreen>
       'type': 'observation',
       'rewarded': false,
     },
+    {
+      'title': '성장 일지 작성',
+      'description': '성장 보고서 3회 작성하기',
+      'progress': 0,
+      'goal': 3,
+      'reward': 200,
+      'icon': Icons.edit_note,
+      'type': 'growth_report',
+      'rewarded': false,
+    },
   ];
 
   // 누적 퀘스트 목록 추가
@@ -232,6 +242,27 @@ class _QuestScreenState extends State<QuestScreen>
       'type': 'nickname',
       'rewarded': false,
       'currentStage': 1,
+    },
+    {
+      'title': '물주기 달인',
+      'description': '누적 물주기 5회 달성하기',
+      'progress': 0,
+      'goal': 5,
+      'reward': 100,
+      'icon': Icons.water_drop,
+      'type': 'total_watering',
+      'rewarded': false,
+      'currentStage': 1,
+    },
+    {
+      'title': '출석 챔피언',
+      'description': '10일 연속 출석하기',
+      'progress': 0,
+      'goal': 10,
+      'reward': 300,
+      'icon': Icons.calendar_month,
+      'type': 'consecutive_attendance',
+      'rewarded': false,
     },
   ];
 
@@ -302,259 +333,261 @@ class _QuestScreenState extends State<QuestScreen>
                   Map<String, dynamic>.from(questData[type] as Map);
               quest['progress'] = questInfo['progress'] ?? 0;
               quest['rewarded'] = questInfo['rewarded'] ?? false;
-
-              // 보상을 이미 받은 경우 버튼 상태 업데이트
-              if (questInfo['rewarded'] == true) {
-                quest['rewarded'] = true;
-              }
             }
           }
         }
 
         return StreamBuilder<DatabaseEvent>(
-          stream:
-              FirebaseDatabase.instance.ref().child('JSON/ESP32SENSOR').onValue,
-          builder: (context, sensorSnapshot) {
-            if (sensorSnapshot.hasData &&
-                sensorSnapshot.data?.snapshot.value != null) {
-              final sensorData = Map<String, dynamic>.from(
-                  sensorSnapshot.data!.snapshot.value as Map);
+          stream: FirebaseDatabase.instance.ref().onValue,
+          builder: (context, jsonSnapshot) {
+            if (jsonSnapshot.hasData &&
+                jsonSnapshot.data?.snapshot.value != null) {
+              final rootData = Map<String, dynamic>.from(
+                  jsonSnapshot.data!.snapshot.value as Map);
+              int wateringCount = 0;
 
-              // 토양습도 체크 (물주기 퀘스트)
-              final soilMoisture = _parseSoilMoisture(sensorData['토양습도']);
-              if (soilMoisture >= 50) {
-                for (var quest in quests) {
-                  if (quest['type'] == 'watering' &&
-                      !(quest['rewarded'] ?? false)) {
-                    quest['progress'] = 1;
-                    _questRef.child('watering').update({
-                      'progress': 1,
-                      'lastUpdate': DateTime.now().toIso8601String(),
-                    });
+              // 각 JSON 노드 확인
+              for (var jsonNode in ['JSON', 'JSON2', 'JSON3']) {
+                if (rootData[jsonNode]?['ESP32SENSOR'] != null) {
+                  final sensorData = Map<String, dynamic>.from(
+                      rootData[jsonNode]['ESP32SENSOR'] as Map);
+                  final soilMoisture = _parseSoilMoisture(sensorData['토양습도']);
+
+                  // 토양습도가 50% 이상인 경우 카운트 증가
+                  if (soilMoisture >= 50) {
+                    wateringCount++;
                   }
                 }
               }
 
-              // 조도 체크 (햇빛 관리 퀘스트)
-              final luxValue = _parseLuxValue(sensorData['조도']);
-              if (luxValue >= 200) {
-                for (var quest in quests) {
-                  if (quest['type'] == 'sunlight' &&
-                      !(quest['rewarded'] ?? false)) {
-                    quest['progress'] = 1;
-                    _questRef.child('sunlight').update({
-                      'progress': 1,
-                      'lastUpdate': DateTime.now().toIso8601String(),
-                    });
-                  }
+              // 물주기 퀘스트 업데이트
+              for (var quest in quests) {
+                if (quest['type'] == 'watering' &&
+                    !(quest['rewarded'] ?? false)) {
+                  final newProgress =
+                      wateringCount > 3 ? 3 : wateringCount; // 최대 3회로 제한
+                  quest['progress'] = newProgress;
+                  _questRef.child('watering').update({
+                    'progress': newProgress,
+                    'lastUpdate': DateTime.now().toIso8601String(),
+                  });
                 }
               }
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: quests.length,
-              itemBuilder: (context, index) {
-                final quest = quests[index];
-                final progress = quest['progress'];
-                final goal = quest['goal'];
-                final progressPercent = progress / goal;
-                final bool isRewarded = quest['rewarded'] ?? false;
+            // 식물 컬렉터 퀘스트 업데이트
+            if (quests.any((quest) => quest['type'] == 'collection')) {
+              return StreamBuilder<DatabaseEvent>(
+                stream: FirebaseDatabase.instance.ref().child('plants').onValue,
+                builder: (context, plantsSnapshot) {
+                  if (plantsSnapshot.hasData &&
+                      plantsSnapshot.data?.snapshot.value != null) {
+                    final plants = Map<String, dynamic>.from(
+                        plantsSnapshot.data!.snapshot.value as Map);
+                    final plantCount = plants.length;
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              quest['icon'] as IconData,
-                              color: Colors.green,
-                              size: 24,
+                    for (var quest in quests) {
+                      if (quest['type'] == 'collection') {
+                        quest['progress'] = plantCount;
+                        _questRef.child('collection').update({
+                          'progress': plantCount,
+                          'lastUpdate': DateTime.now().toIso8601String(),
+                        });
+                      }
+                    }
+                  }
+                  return _buildQuestListView(quests);
+                },
+              );
+            }
+
+            return _buildQuestListView(quests);
+          },
+        );
+      },
+    );
+  }
+
+  // 퀘스트 목록 UI 부분을 별도 메서드로 분리
+  Widget _buildQuestListView(List<Map<String, dynamic>> quests) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: quests.length,
+      itemBuilder: (context, index) {
+        final quest = quests[index];
+        final progress = quest['progress'];
+        final goal = quest['goal'];
+        final progressPercent = progress / goal;
+        final bool isRewarded = quest['rewarded'] ?? false;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      quest['icon'] as IconData,
+                      color: Colors.green,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      quest['title'],
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  quest['description'],
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+                if (quest['type'] == 'watering')
+                  StreamBuilder<DatabaseEvent>(
+                    stream: FirebaseDatabase.instance
+                        .ref()
+                        .child('JSON/ESP32SENSOR')
+                        .onValue,
+                    builder: (context, sensorSnapshot) {
+                      if (sensorSnapshot.hasData &&
+                          sensorSnapshot.data?.snapshot.value != null) {
+                        final sensorData = Map<String, dynamic>.from(
+                            sensorSnapshot.data!.snapshot.value as Map);
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            '현재 토양습도: ${sensorData['토양습도'] ?? '측정중...'}',
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              fontSize: 12,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              quest['title'],
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                          ),
+                        );
+                      }
+                      return const SizedBox();
+                    },
+                  ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: progressPercent,
+                          backgroundColor: Colors.grey[200],
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(Colors.green),
+                          minHeight: 8,
                         ),
-                        const SizedBox(height: 8),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$progress/$goal',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star,
+                          color: Colors.amber,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
                         Text(
-                          quest['description'],
+                          '${quest['reward']} 코인',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
                           ),
                         ),
-                        if (quest['type'] == 'watering')
-                          StreamBuilder<DatabaseEvent>(
-                            stream: FirebaseDatabase.instance
-                                .ref()
-                                .child('JSON/ESP32SENSOR')
-                                .onValue,
-                            builder: (context, sensorSnapshot) {
-                              if (sensorSnapshot.hasData &&
-                                  sensorSnapshot.data?.snapshot.value != null) {
-                                final sensorData = Map<String, dynamic>.from(
-                                    sensorSnapshot.data!.snapshot.value as Map);
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    '현재 토양습도: ${sensorData['토양습도'] ?? '측정중...'}',
-                                    style: const TextStyle(
-                                      color: Colors.blue,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                );
-                              }
-                              return const SizedBox();
-                            },
-                          ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: LinearProgressIndicator(
-                                  value: progressPercent,
-                                  backgroundColor: Colors.grey[200],
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
-                                          Colors.green),
-                                  minHeight: 8,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '$progress/$goal',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.star,
-                                  color: Colors.amber,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${quest['reward']} 코인',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (progress >= goal)
-                              ElevatedButton(
-                                onPressed: isRewarded
-                                    ? null
-                                    : () async {
-                                        try {
-                                          // 보상 수령 전에 현재 상태 다시 확인
-                                          final currentSnapshot =
-                                              await _questRef
-                                                  .child(quest['type'])
-                                                  .get();
-                                          if (currentSnapshot.exists) {
-                                            final currentData =
-                                                Map<String, dynamic>.from(
-                                                    currentSnapshot.value
-                                                        as Map);
-                                            if (currentData['rewarded'] ==
-                                                true) {
-                                              // 이미 보상을 받은 경우
-                                              setState(() {
-                                                quest['rewarded'] = true;
-                                              });
-                                              return;
-                                            }
-                                          }
-
-                                          // 보상 지급 및 상태 업데이트
-                                          await _updateCoins(
-                                              quest['reward'] as int);
-                                          await _questRef
-                                              .child(quest['type'])
-                                              .update({
-                                            'rewarded': true,
-                                            'lastUpdate': DateTime.now()
-                                                .toIso8601String(),
-                                          });
-
-                                          // 로컬 상태 업데이트
-                                          setState(() {
-                                            quest['rewarded'] = true;
-                                          });
-
-                                          if (!mounted) return;
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                  '${quest['reward']} 코인이 지급되었습니다!'),
-                                              backgroundColor: Colors.green,
-                                            ),
-                                          );
-                                        } catch (e) {
-                                          print('보상 지급 오류: $e');
-                                          if (!mounted) return;
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                              content:
-                                                  Text('보상 지급 중 오류가 발생했습니다'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
-                                      },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      isRewarded ? Colors.grey : Colors.green,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: Text(
-                                  isRewarded ? '완료' : '보상 수령',
-                                  style: TextStyle(
-                                    color: isRewarded
-                                        ? Colors.grey[400]
-                                        : Colors.white,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
                       ],
                     ),
-                  ),
-                );
-              },
-            );
-          },
+                    if (progress >= goal)
+                      ElevatedButton(
+                        onPressed: isRewarded
+                            ? null
+                            : () async {
+                                try {
+                                  // 보상 수령 전에 현재 상태 다시 확인
+                                  final currentSnapshot = await _questRef
+                                      .child(quest['type'])
+                                      .get();
+                                  if (currentSnapshot.exists) {
+                                    final currentData =
+                                        Map<String, dynamic>.from(
+                                            currentSnapshot.value as Map);
+                                    if (currentData['rewarded'] == true) {
+                                      setState(() {
+                                        quest['rewarded'] = true;
+                                      });
+                                      return;
+                                    }
+                                  }
+
+                                  // 보상 지급 및 상태 업데이트
+                                  await _updateCoins(quest['reward'] as int);
+                                  await _questRef.child(quest['type']).update({
+                                    'rewarded': true,
+                                    'lastUpdate':
+                                        DateTime.now().toIso8601String(),
+                                  });
+
+                                  setState(() {
+                                    quest['rewarded'] = true;
+                                  });
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          '${quest['reward']} 코인이 지급되었습니다!'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  print('보상 지급 오류: $e');
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              isRewarded ? Colors.grey : Colors.green,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                        ),
+                        child: Text(
+                          isRewarded ? '완료' : '보상 수령',
+                          style: TextStyle(
+                            color: isRewarded ? Colors.grey[400] : Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -576,14 +609,14 @@ class _QuestScreenState extends State<QuestScreen>
 
   // 출석 체크 퀘스트 업데이트 메서드 수정
   Future<void> _updateAttendanceQuest() async {
-    final questRef = FirebaseDatabase.instance.ref().child('quests/attendance');
+    final questRef = FirebaseDatabase.instance.ref().child('quests');
     final snapshot = await questRef.get();
 
     try {
       if (snapshot.exists) {
         final questData = Map<String, dynamic>.from(snapshot.value as Map);
-        final lastUpdate = questData['lastUpdate'] != null
-            ? DateTime.parse(questData['lastUpdate'])
+        final lastUpdate = questData['attendance']?['lastUpdate'] != null
+            ? DateTime.parse(questData['attendance']['lastUpdate'])
             : null;
         final now = DateTime.now();
 
@@ -592,20 +625,71 @@ class _QuestScreenState extends State<QuestScreen>
             lastUpdate.day != now.day ||
             lastUpdate.month != now.month ||
             lastUpdate.year != now.year) {
-          await questRef.update({
+          // 일일 출석 퀘스트 업데이트
+          await questRef.child('attendance').update({
             'progress': 1,
             'lastUpdate': now.toIso8601String(),
             'rewarded': false,
             'goal': 1,
           });
+
+          // 연속 출석 퀘스트 업데이트
+          final consecutiveRef = questRef.child('consecutive_attendance');
+          final consecutiveSnapshot = await consecutiveRef.get();
+
+          if (consecutiveSnapshot.exists) {
+            final consecutiveData =
+                Map<String, dynamic>.from(consecutiveSnapshot.value as Map);
+            final lastConsecutiveDate = consecutiveData['lastUpdate'] != null
+                ? DateTime.parse(consecutiveData['lastUpdate'])
+                : null;
+
+            // 어제 출석했는지 확인
+            if (lastConsecutiveDate != null &&
+                lastConsecutiveDate.difference(now).inDays.abs() == 1) {
+              // 연속 출석 증가
+              final currentProgress = consecutiveData['progress'] ?? 0;
+              if (currentProgress < 10 &&
+                  !(consecutiveData['rewarded'] ?? false)) {
+                await consecutiveRef.update({
+                  'progress': currentProgress + 1,
+                  'lastUpdate': now.toIso8601String(),
+                });
+              }
+            } else if (lastConsecutiveDate == null ||
+                lastConsecutiveDate.difference(now).inDays.abs() > 1) {
+              // 연속 출석 초기화
+              await consecutiveRef.update({
+                'progress': 1,
+                'lastUpdate': now.toIso8601String(),
+                'rewarded': false,
+              });
+            }
+          } else {
+            // 최초 연속 출석 시작
+            await consecutiveRef.set({
+              'progress': 1,
+              'goal': 10,
+              'lastUpdate': now.toIso8601String(),
+              'rewarded': false,
+            });
+          }
         }
       } else {
         // 최초 실행 시
         await questRef.set({
-          'progress': 1,
-          'goal': 1,
-          'lastUpdate': DateTime.now().toIso8601String(),
-          'rewarded': false,
+          'attendance': {
+            'progress': 1,
+            'goal': 1,
+            'lastUpdate': DateTime.now().toIso8601String(),
+            'rewarded': false,
+          },
+          'consecutive_attendance': {
+            'progress': 1,
+            'goal': 10,
+            'lastUpdate': DateTime.now().toIso8601String(),
+            'rewarded': false,
+          },
         });
       }
     } catch (e) {
@@ -618,42 +702,31 @@ class _QuestScreenState extends State<QuestScreen>
     try {
       final now = DateTime.now();
       final questRef = FirebaseDatabase.instance.ref().child('quests');
-      final snapshot = await questRef.child('attendance').get();
 
-      // 현재 출석 체크 상태 확인
-      Map<String, dynamic> attendanceData = {};
+      // 현재 퀘스트 상태 확인
+      final snapshot = await questRef.get();
+      Map<String, dynamic> currentQuestData = {};
+
       if (snapshot.exists) {
-        attendanceData = Map<String, dynamic>.from(snapshot.value as Map);
-        final lastUpdate = attendanceData['lastUpdate'] != null
-            ? DateTime.parse(attendanceData['lastUpdate'])
+        currentQuestData = Map<String, dynamic>.from(snapshot.value as Map);
+        final lastUpdate = currentQuestData['lastResetDate'] != null
+            ? DateTime.parse(currentQuestData['lastResetDate'])
             : null;
 
-        // 마지막 업데이트가 오늘인 경우 출석 데이터 유지
+        // 날짜가 바뀌지 않았다면 rewarded 상태 유지
         if (lastUpdate != null &&
             lastUpdate.day == now.day &&
             lastUpdate.month == now.month &&
             lastUpdate.year == now.year) {
-          attendanceData = {
-            'progress': attendanceData['progress'],
-            'goal': attendanceData['goal'],
-            'lastUpdate': attendanceData['lastUpdate'],
-            'rewarded': attendanceData['rewarded'],
-          };
-        } else {
-          // 다른 날짜인 경우 초기화
-          attendanceData = {
-            'progress': 0,
-            'goal': 1,
-            'lastUpdate': null,
-            'rewarded': false,
-          };
+          return; // 같은 날이면 초기화하지 않음
         }
       }
 
+      // 날짜가 바뀌었거나 데이터가 없는 경우 초기화
       await questRef.set({
         'watering': {
           'progress': 0,
-          'goal': 1,
+          'goal': 3, // 3회로 수정
           'lastUpdate': now.toIso8601String(),
           'rewarded': false,
         },
@@ -663,22 +736,21 @@ class _QuestScreenState extends State<QuestScreen>
           'lastUpdate': now.toIso8601String(),
           'rewarded': false,
         },
-        'attendance': attendanceData, // 출석 데이터 유지 또는 초기화
+        'attendance': {
+          'progress': 0,
+          'goal': 1,
+          'lastUpdate': null,
+          'rewarded': false,
+        },
         'observation': {
           'progress': 0,
           'goal': 5,
           'lastUpdate': now.toIso8601String(),
           'rewarded': false,
         },
-        'collection': {
+        'growth_report': {
           'progress': 0,
           'goal': 3,
-          'lastUpdate': now.toIso8601String(),
-          'rewarded': false,
-        },
-        'nickname': {
-          'progress': 0,
-          'goal': 1,
           'lastUpdate': now.toIso8601String(),
           'rewarded': false,
         },
