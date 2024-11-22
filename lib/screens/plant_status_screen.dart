@@ -31,15 +31,18 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
   @override
   void initState() {
     super.initState();
-    _updateObservationQuest();
     _tabController = TabController(length: 2, vsync: this);
-    // Stream을 broadcast로 변환
+    String sensorNode = widget.plant['sensorNode'] ?? 'JSON';
     _sensorStream = FirebaseDatabase.instance
         .ref()
-        .child('JSON/ESP32SENSOR')
+        .child(sensorNode)
+        .child('ESP32SENSOR')
         .onValue
         .asBroadcastStream();
     _nickname = widget.plant['nickname'];
+
+    // 상태 체크 퀘스트 업데이트
+    _updateObservationQuest();
   }
 
   Future<void> _updateObservationQuest() async {
@@ -47,24 +50,31 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
         FirebaseDatabase.instance.ref().child('quests/observation');
     final snapshot = await questRef.get();
 
-    if (snapshot.exists) {
-      final questData = Map<String, dynamic>.from(snapshot.value as Map);
-      final lastUpdate = questData['lastUpdate'] != null
-          ? DateTime.parse(questData['lastUpdate'])
-          : null;
-      final now = DateTime.now();
-
-      // 마지막 업데이트가 없거나 10분이 지났다면 진행도 증가
-      if (lastUpdate == null || now.difference(lastUpdate).inMinutes >= 10) {
+    try {
+      if (snapshot.exists) {
+        final questData = Map<String, dynamic>.from(snapshot.value as Map);
         final currentProgress = questData['progress'] ?? 0;
-        if (currentProgress < 5) {
-          // 최대 5회까지만 증가
+        final isRewarded = questData['rewarded'] ?? false;
+
+        // 보상을 받지 않았고 최대 횟수(5회)에 도달하지 않은 경우에만 증가
+        if (!isRewarded && currentProgress < 5) {
           await questRef.update({
             'progress': currentProgress + 1,
-            'lastUpdate': now.toIso8601String(),
+            'lastUpdate': DateTime.now().toIso8601String(),
+            'rewarded': false,
           });
         }
+      } else {
+        // 최초 실행 시
+        await questRef.set({
+          'progress': 1,
+          'goal': 5,
+          'lastUpdate': DateTime.now().toIso8601String(),
+          'rewarded': false,
+        });
       }
+    } catch (e) {
+      print('관찰 퀘스트 업데이트 오류: $e');
     }
   }
 
@@ -91,7 +101,6 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
               final newNickname = controller.text.trim();
               if (newNickname.isNotEmpty) {
                 try {
-                  // widget.plant에서 id를 직접 가져오는 대신 안전하게 처리
                   final plantId = widget.plant['id']?.toString();
                   if (plantId == null || plantId.isEmpty) {
                     throw Exception('식물 ID를 찾을 수 없습니다');
@@ -113,6 +122,60 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                     // 전체 데이터 업데이트
                     await plantRef.update(plantData);
 
+                    // 별명 퀘스트 업데이트
+                    final questRef = FirebaseDatabase.instance
+                        .ref()
+                        .child('quests/nickname');
+                    final nicknameHistoryRef = FirebaseDatabase.instance
+                        .ref()
+                        .child('nickname_history');
+
+                    try {
+                      // 별명 변경 이력 저장
+                      await nicknameHistoryRef.push().set({
+                        'plantId': plantId,
+                        'nickname': newNickname,
+                        'timestamp': DateTime.now().toIso8601String(),
+                      });
+
+                      // 퀘스트 데이터 업데이트
+                      final questSnapshot = await questRef.get();
+                      if (questSnapshot.exists) {
+                        final questData = Map<String, dynamic>.from(
+                            questSnapshot.value as Map);
+                        final isRewarded = questData['rewarded'] ?? false;
+                        final currentProgress = questData['progress'] ?? 0;
+                        final currentGoal = questData['goal'] ?? 1;
+
+                        // 보상을 받은 상태이고 현재 진행도가 0이면 새로운 진행 시작
+                        if (isRewarded && currentProgress == 0) {
+                          await questRef.update({
+                            'progress': 1,
+                            'rewarded': false, // 새로운 진행을 위해 rewarded 상태 초기화
+                            'lastUpdate': DateTime.now().toIso8601String(),
+                          });
+                        }
+                        // 보상을 받지 않은 상태에서 목표에 도달하지 않았다면 진행도 증가
+                        else if (!isRewarded && currentProgress < currentGoal) {
+                          await questRef.update({
+                            'progress': currentProgress + 1,
+                            'lastUpdate': DateTime.now().toIso8601String(),
+                          });
+                        }
+                      } else {
+                        // 최초 실행 시
+                        await questRef.set({
+                          'progress': 1,
+                          'goal': 1,
+                          'rewarded': false,
+                          'lastUpdate': DateTime.now().toIso8601String(),
+                        });
+                      }
+                    } catch (e) {
+                      print('별명 저장 오류: $e');
+                      rethrow;
+                    }
+
                     setState(() {
                       _nickname = newNickname;
                     });
@@ -124,8 +187,6 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                         backgroundColor: Colors.green,
                       ),
                     );
-                  } else {
-                    throw Exception('식물 데이터를 찾을 수 없습니다');
                   }
                 } catch (e) {
                   print('닉네임 저장 오류: $e');
@@ -598,7 +659,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
             child: ListTile(
               leading: Icon(Icons.camera_alt, color: Colors.grey),
               title: Text('실시간 식물 사진 보기'),
-              subtitle: Text('카메라 연결 대기중...'),
+              subtitle: Text('카라 연결 대기중...'),
             ),
           );
         }

@@ -155,28 +155,33 @@ class _HomeScreenState extends State<HomeScreen> {
         Map<dynamic, dynamic> plants =
             Map<dynamic, dynamic>.from(snapshotValue);
 
-        return StreamBuilder<DatabaseEvent>(
-          stream: FirebaseDatabase.instance
-              .ref()
-              .child('JSON/ESP32SENSOR')
-              .onValue
-              .asBroadcastStream(),
-          builder: (context, AsyncSnapshot<DatabaseEvent> sensorSnapshot) {
-            Map<String, dynamic> sensorData = {};
+        return ListView.builder(
+          itemCount: plants.length,
+          itemBuilder: (context, index) {
+            String key = plants.keys.elementAt(index);
+            Map<dynamic, dynamic> plant =
+                Map<dynamic, dynamic>.from(plants[key]);
+            plant['id'] = key;
 
-            if (sensorSnapshot.hasData &&
-                sensorSnapshot.data?.snapshot.value != null) {
-              sensorData = Map<String, dynamic>.from(
-                  sensorSnapshot.data!.snapshot.value as Map);
-            }
+            String jsonNode = 'JSON';
+            if (index == 1) jsonNode = 'JSON2';
+            if (index == 2) jsonNode = 'JSON3';
 
-            return ListView.builder(
-              itemCount: plants.length,
-              itemBuilder: (context, index) {
-                String key = plants.keys.elementAt(index);
-                Map<dynamic, dynamic> plant =
-                    Map<dynamic, dynamic>.from(plants[key]);
-                plant['id'] = key;
+            return StreamBuilder<DatabaseEvent>(
+              stream: FirebaseDatabase.instance
+                  .ref()
+                  .child(jsonNode)
+                  .child('ESP32SENSOR')
+                  .onValue
+                  .asBroadcastStream(),
+              builder: (context, AsyncSnapshot<DatabaseEvent> sensorSnapshot) {
+                Map<String, dynamic> sensorData = {};
+
+                if (sensorSnapshot.hasData &&
+                    sensorSnapshot.data?.snapshot.value != null) {
+                  sensorData = Map<String, dynamic>.from(
+                      sensorSnapshot.data!.snapshot.value as Map);
+                }
 
                 return Card(
                   margin:
@@ -185,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () {
                       Map<String, dynamic> plantData =
                           Map<String, dynamic>.from(plant);
+                      plantData['sensorNode'] = jsonNode;
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -217,6 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text('센서 노드: $jsonNode'),
                             Row(
                               children: [
                                 const Icon(Icons.water_drop,
