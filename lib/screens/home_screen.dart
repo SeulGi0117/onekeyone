@@ -6,8 +6,11 @@ import '../services/nongsaro_api_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../services/database_service.dart';
 import 'plant_status_screen.dart';
+import 'quest_screen.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
@@ -17,6 +20,20 @@ class _HomeScreenState extends State<HomeScreen> {
   final NongsaroApiService _apiService = NongsaroApiService();
   int _selectedIndex = 0;
 
+  late final Stream<DatabaseEvent> _plantsStream;
+  late final Stream<DatabaseEvent> _sensorStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _plantsStream = _databaseService.getPlantData().asBroadcastStream();
+    _sensorStream = FirebaseDatabase.instance
+        .ref()
+        .child('JSON/ESP32SENSOR')
+        .onValue
+        .asBroadcastStream();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -25,6 +42,20 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        actions: [
+          if (_selectedIndex == 0)
+            IconButton(
+              icon: const Icon(Icons.assignment),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const QuestScreen(),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -36,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_selectedIndex == 0)
             Container(
               width: double.infinity,
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: ElevatedButton.icon(
                 onPressed: () async {
                   await Navigator.push(
@@ -46,8 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   );
                 },
-                icon: Icon(Icons.add, color: Colors.white),
-                label: Text(
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text(
                   '식물 등록하기',
                   style: TextStyle(
                     color: Colors.white,
@@ -57,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -73,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _selectedIndex = index;
           });
         },
-        items: [
+        items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: '내 식물',
@@ -89,18 +120,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeScreen() {
-    return StreamBuilder(
-      stream: _databaseService.getPlantData(),
+    return StreamBuilder<DatabaseEvent>(
+      stream: FirebaseDatabase.instance
+          .ref()
+          .child('plants')
+          .onValue
+          .asBroadcastStream(),
       builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('오류가 발생했습니다'));
+          return const Center(child: Text('오류가 발생했습니다'));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         }
 
-        if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+        final dynamic snapshotValue = snapshot.data?.snapshot.value;
+        if (snapshotValue == null) {
           return Center(
             child: Text(
               '등록된 식물이 없습니다',
@@ -112,15 +148,24 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        Map<dynamic, dynamic> plants =
-            snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+        if (snapshotValue is! Map) {
+          return const Center(child: Text('데이터 형식이 올바르지 않습니다'));
+        }
 
-        return StreamBuilder(
-          stream: FirebaseDatabase.instance.ref().child('JSON/ESP32SENSOR').onValue,
+        Map<dynamic, dynamic> plants =
+            Map<dynamic, dynamic>.from(snapshotValue);
+
+        return StreamBuilder<DatabaseEvent>(
+          stream: FirebaseDatabase.instance
+              .ref()
+              .child('JSON/ESP32SENSOR')
+              .onValue
+              .asBroadcastStream(),
           builder: (context, AsyncSnapshot<DatabaseEvent> sensorSnapshot) {
             Map<String, dynamic> sensorData = {};
-            
-            if (sensorSnapshot.hasData && sensorSnapshot.data?.snapshot.value != null) {
+
+            if (sensorSnapshot.hasData &&
+                sensorSnapshot.data?.snapshot.value != null) {
               sensorData = Map<String, dynamic>.from(
                   sensorSnapshot.data!.snapshot.value as Map);
             }
@@ -129,10 +174,13 @@ class _HomeScreenState extends State<HomeScreen> {
               itemCount: plants.length,
               itemBuilder: (context, index) {
                 String key = plants.keys.elementAt(index);
-                Map<dynamic, dynamic> plant = plants[key];
+                Map<dynamic, dynamic> plant =
+                    Map<dynamic, dynamic>.from(plants[key]);
+                plant['id'] = key;
 
                 return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: InkWell(
                     onTap: () {
                       Map<String, dynamic> plantData =
@@ -159,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       title: Text(
                         plant['name'],
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -171,55 +219,55 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.water_drop,
+                                const Icon(Icons.water_drop,
                                     size: 16, color: Colors.blue),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text(
                                     '마지막 물주기: ${_formatDate(plant['lastWatered'])}'),
                               ],
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.favorite,
+                                const Icon(Icons.favorite,
                                     size: 16, color: Colors.green),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text('상태: ${plant['status']}'),
                               ],
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.thermostat,
+                                const Icon(Icons.thermostat,
                                     size: 16, color: Colors.orange),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text('온도: ${sensorData['온도'] ?? '측정중'}'),
                               ],
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.opacity,
+                                const Icon(Icons.opacity,
                                     size: 16, color: Colors.lightBlue),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text('습도: ${sensorData['습도'] ?? '측정중'}'),
                               ],
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.wb_sunny,
+                                const Icon(Icons.wb_sunny,
                                     size: 16, color: Colors.yellow),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text('조도: ${sensorData['조도'] ?? '측정중'}'),
                               ],
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.water,
+                                const Icon(Icons.water,
                                     size: 16, color: Colors.blue),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text('토양습도: ${sensorData['토양습도'] ?? '측정중'}'),
                               ],
                             ),
@@ -227,9 +275,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       trailing: PopupMenuButton(
-                        icon: Icon(Icons.more_vert),
+                        icon: const Icon(Icons.more_vert),
                         itemBuilder: (context) => [
-                          PopupMenuItem(
+                          const PopupMenuItem(
                             value: 'delete',
                             child: Row(
                               children: [
@@ -247,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               context: context,
                               builder: (BuildContext context) {
                                 return AlertDialog(
-                                  title: Text('식물 삭제'),
+                                  title: const Text('식물 삭제'),
                                   content: Text(
                                       '정말로 등록된 ${plant['name']}을(를) 삭제하시겠습니까?'),
                                   actions: [
@@ -265,7 +313,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onPressed: () async {
                                         await _databaseService.deletePlant(key);
                                         Navigator.pop(context);
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           SnackBar(
                                             content: Text(
                                                 '${plant['name']}이(가) 삭제되었습니다'),
@@ -277,7 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         backgroundColor: Colors.red,
                                         elevation: 0,
                                       ),
-                                      child: Text(
+                                      child: const Text(
                                         '삭제합니다',
                                         style: TextStyle(
                                           color: Colors.white,
@@ -289,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  actionsPadding: EdgeInsets.symmetric(
+                                  actionsPadding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 8),
                                 );
                               },
@@ -297,7 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         },
                       ),
-                      contentPadding: EdgeInsets.all(12),
+                      contentPadding: const EdgeInsets.all(12),
                     ),
                   ),
                 );

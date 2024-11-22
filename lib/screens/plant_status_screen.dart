@@ -10,26 +10,28 @@ class PlantStatusScreen extends StatefulWidget {
   final Map<String, dynamic>? sensorData;
 
   const PlantStatusScreen({
-    Key? key,
+    super.key,
     required this.plant,
     this.sensorData,
-  }) : super(key: key);
+  });
 
   @override
   _PlantStatusScreenState createState() => _PlantStatusScreenState();
 }
 
-class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTickerProviderStateMixin {
+class _PlantStatusScreenState extends State<PlantStatusScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   bool _isDisposed = false;
   String? _nickname;
-  
+
   // Stream을 broadcast로 변환하여 여러 번 구독 가능하게 함
   late final Stream<DatabaseEvent> _sensorStream;
 
   @override
   void initState() {
     super.initState();
+    _updateObservationQuest();
     _tabController = TabController(length: 2, vsync: this);
     // Stream을 broadcast로 변환
     _sensorStream = FirebaseDatabase.instance
@@ -40,15 +42,41 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
     _nickname = widget.plant['nickname'];
   }
 
+  Future<void> _updateObservationQuest() async {
+    final questRef =
+        FirebaseDatabase.instance.ref().child('quests/observation');
+    final snapshot = await questRef.get();
+
+    if (snapshot.exists) {
+      final questData = Map<String, dynamic>.from(snapshot.value as Map);
+      final lastUpdate = questData['lastUpdate'] != null
+          ? DateTime.parse(questData['lastUpdate'])
+          : null;
+      final now = DateTime.now();
+
+      // 마지막 업데이트가 없거나 10분이 지났다면 진행도 증가
+      if (lastUpdate == null || now.difference(lastUpdate).inMinutes >= 10) {
+        final currentProgress = questData['progress'] ?? 0;
+        if (currentProgress < 5) {
+          // 최대 5회까지만 증가
+          await questRef.update({
+            'progress': currentProgress + 1,
+            'lastUpdate': now.toIso8601String(),
+          });
+        }
+      }
+    }
+  }
+
   void _editNickname() {
     TextEditingController controller = TextEditingController(text: _nickname);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('식물 별명 설정'),
+        title: const Text('식물 별명 설정'),
         content: TextField(
           controller: controller,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: '식물의 별명을 입력해주세요',
             border: OutlineInputBorder(),
           ),
@@ -56,7 +84,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('취소'),
+            child: const Text('취소'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -74,23 +102,24 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
                       .ref()
                       .child('plants')
                       .child(plantId);
-                  
+
                   // 현재 데이터를 가져와서 nickname만 업데이트
                   final snapshot = await plantRef.get();
                   if (snapshot.exists) {
-                    final plantData = Map<String, dynamic>.from(snapshot.value as Map);
+                    final plantData =
+                        Map<String, dynamic>.from(snapshot.value as Map);
                     plantData['nickname'] = newNickname;
-                    
+
                     // 전체 데이터 업데이트
                     await plantRef.update(plantData);
-                    
+
                     setState(() {
                       _nickname = newNickname;
                     });
-                    
+
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                      const SnackBar(
                         content: Text('식물 별명이 변경되었습니다'),
                         backgroundColor: Colors.green,
                       ),
@@ -102,7 +131,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
                   print('닉네임 저장 오류: $e');
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    const SnackBar(
                       content: Text('별명 저장에 실패했습니다'),
                       backgroundColor: Colors.red,
                     ),
@@ -110,7 +139,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
                 }
               }
             },
-            child: Text('저장'),
+            child: const Text('저장'),
           ),
         ],
       ),
@@ -133,7 +162,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
           title: Text(_nickname ?? widget.plant['name']),
           bottom: TabBar(
             controller: _tabController,
-            tabs: [
+            tabs: const [
               Tab(text: '실시간 데이터'),
               Tab(text: '식물 정보'),
             ],
@@ -155,18 +184,18 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
 
   Widget _buildRealTimeDataTab(BuildContext context) {
     if (_isDisposed) return Container();
-    
+
     return StreamBuilder<DatabaseEvent>(
-      key: ValueKey('realtime_data_stream'),
-      stream: _sensorStream,  // broadcast stream 사용
+      key: const ValueKey('realtime_data_stream'),
+      stream: _sensorStream, // broadcast stream 사용
       builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
         if (_isDisposed) return Container();
 
         Map<String, dynamic> currentSensorData = {};
-        
+
         if (snapshot.hasData && snapshot.data?.snapshot.value != null) {
-          currentSensorData = Map<String, dynamic>.from(
-              snapshot.data!.snapshot.value as Map);
+          currentSensorData =
+              Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
         }
 
         // 센서값 파싱 함수
@@ -178,7 +207,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
         }
 
         return SingleChildScrollView(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -193,8 +222,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
                   ),
                 ),
               ),
-              SizedBox(height: 20),
-              
+              const SizedBox(height: 20),
+
               // 식물 이름과 별명 설정 버튼
               Row(
                 children: [
@@ -204,7 +233,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
                       children: [
                         Text(
                           widget.plant['name'],
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
@@ -220,7 +249,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
                                   color: Colors.grey[600],
                                 ),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Icon(
                                 Icons.edit,
                                 size: 16,
@@ -234,55 +263,63 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
                   ),
                 ],
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // 센서 데이터 카드들
               _buildSensorCard(
                 Icons.thermostat,
                 '현재 온도',
-                snapshot.hasData ? parseValue(currentSensorData['온도']?.toString(), '°C') : '측정중...',
+                snapshot.hasData
+                    ? parseValue(currentSensorData['온도']?.toString(), '°C')
+                    : '측정중...',
                 Colors.orange,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _buildSensorCard(
                 Icons.opacity,
                 '현재 습도',
-                snapshot.hasData ? parseValue(currentSensorData['습도']?.toString(), '%') : '측정중...',
+                snapshot.hasData
+                    ? parseValue(currentSensorData['습도']?.toString(), '%')
+                    : '측정중...',
                 Colors.blue,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _buildSensorCard(
                 Icons.wb_sunny,
                 '현재 조도',
-                snapshot.hasData ? parseValue(currentSensorData['조도']?.toString(), ' lux') : '측정중...',
+                snapshot.hasData
+                    ? parseValue(currentSensorData['조도']?.toString(), ' lux')
+                    : '측정중...',
                 Colors.yellow,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _buildSensorCard(
                 Icons.water_drop,
                 '현재 토양습도',
-                snapshot.hasData ? parseValue(currentSensorData['토양습도']?.toString(), '%') : '측정중...',
+                snapshot.hasData
+                    ? parseValue(currentSensorData['토양습도']?.toString(), '%')
+                    : '측정중...',
                 Colors.brown,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _buildCameraCard(),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // 식물 건강 상태 섹션
               Card(
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         '식물 건강 상태',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       _buildHealthRow(
                         Icons.favorite,
                         '건강 상태',
@@ -313,53 +350,54 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
   }
 
   Widget _buildPlantInfoTab(BuildContext context) {
-    final NongsaroApiService _apiService = NongsaroApiService();
+    final NongsaroApiService apiService = NongsaroApiService();
 
     return FutureBuilder<Map<String, dynamic>?>(
-      future: _apiService.getPlantDetails(
+      future: apiService.getPlantDetails(
         widget.plant['name'],
         scientificName: widget.plant['scientificName'],
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('식물 정보를 불러오는데 실패했습니다.'));
+          return const Center(child: Text('식물 정보를 불러오는데 실패했습니다.'));
         }
 
-        final plantDetails = snapshot.data ?? {
-          'koreanName': '-',
-          'scientificName': '-',
-          'englishName': '-',
-          'familyName': '-',
-          'origin': '-',
-          'growthHeight': '-',
-          'growthWidth': '-',
-          'leafInfo': '-',
-          'flowerInfo': '-',
-          'managementLevel': '-',
-          'lightDemand': '-',
-          'waterCycle': {
-            'spring': '-',
-            'summer': '-',
-            'autumn': '-',
-            'winter': '-',
-          },
-          'temperature': {
-            'growth': '-',
-            'winter': '-',
-          },
-          'humidity': '-',
-          'specialManagement': '-',
-          'toxicity': '-',
-        };
+        final plantDetails = snapshot.data ??
+            {
+              'koreanName': '-',
+              'scientificName': '-',
+              'englishName': '-',
+              'familyName': '-',
+              'origin': '-',
+              'growthHeight': '-',
+              'growthWidth': '-',
+              'leafInfo': '-',
+              'flowerInfo': '-',
+              'managementLevel': '-',
+              'lightDemand': '-',
+              'waterCycle': {
+                'spring': '-',
+                'summer': '-',
+                'autumn': '-',
+                'winter': '-',
+              },
+              'temperature': {
+                'growth': '-',
+                'winter': '-',
+              },
+              'humidity': '-',
+              'specialManagement': '-',
+              'toxicity': '-',
+            };
 
         if (snapshot.data == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('식물 정보를 찾을 수 없습니다.'),
                 backgroundColor: Colors.red,
               ),
@@ -368,15 +406,15 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
         }
 
         return SingleChildScrollView(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 '기본 정보',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _buildInfoSection('식물명', [
                 _buildInfoRow('한글명', plantDetails['koreanName']),
                 _buildInfoRow('영문명', plantDetails['englishName']),
@@ -393,7 +431,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
               _buildInfoSection('관리 정보', [
                 _buildInfoRow('관리 수준', plantDetails['managementLevel']),
                 _buildInfoRow('광 요구도', plantDetails['lightDemand']),
-                _buildInfoRow('물 주기', '봄: ${plantDetails['waterCycle']['spring']}, 여름: ${plantDetails['waterCycle']['summer']}, 가을: ${plantDetails['waterCycle']['autumn']}, 겨울: ${plantDetails['waterCycle']['winter']}'),
+                _buildInfoRow('물 주기',
+                    '봄: ${plantDetails['waterCycle']['spring']}, 여름: ${plantDetails['waterCycle']['summer']}, 가을: ${plantDetails['waterCycle']['autumn']}, 겨울: ${plantDetails['waterCycle']['winter']}'),
                 _buildInfoRow('성장 온도', plantDetails['temperature']['growth']),
                 _buildInfoRow('겨울 온도', plantDetails['temperature']['winter']),
                 _buildInfoRow('습도', plantDetails['humidity']),
@@ -407,7 +446,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
     );
   }
 
-  Widget _buildSensorCard(IconData icon, String label, String value, Color color) {
+  Widget _buildSensorCard(
+      IconData icon, String label, String value, Color color) {
     return Card(
       child: ListTile(
         leading: Icon(icon, color: color, size: 30),
@@ -420,7 +460,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
         ),
         trailing: Text(
           value,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -429,13 +469,14 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
     );
   }
 
-  Widget _buildHealthRow(IconData icon, String label, String value, Color color) {
+  Widget _buildHealthRow(
+      IconData icon, String label, String value, Color color) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           Icon(icon, color: color, size: 24),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Text(
             label,
             style: TextStyle(
@@ -443,7 +484,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
               color: Colors.grey[600],
             ),
           ),
-          Spacer(),
+          const Spacer(),
           Text(
             value,
             style: TextStyle(
@@ -463,15 +504,15 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
       children: [
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.green,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         ...children,
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -495,7 +536,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.black87,
               ),
             ),
@@ -515,9 +556,9 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
             mainAxisSize: MainAxisSize.min,
             children: [
               AppBar(
-                title: Text('실시간 식물 사진'),
+                title: const Text('실시간 식물 사진'),
                 leading: IconButton(
-                  icon: Icon(Icons.close),
+                  icon: const Icon(Icons.close),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
@@ -542,7 +583,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
     if (_isDisposed) return Container();
 
     return StreamBuilder<DatabaseEvent>(
-      key: ValueKey('camera_stream'),
+      key: const ValueKey('camera_stream'),
       stream: FirebaseDatabase.instance
           .ref()
           .child('JSON/ESP32CAM')
@@ -552,7 +593,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
         if (_isDisposed) return Container();
 
         if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
-          return Card(
+          return const Card(
             child: ListTile(
               leading: Icon(Icons.camera_alt, color: Colors.grey),
               title: Text('실시간 식물 사진 보기'),
@@ -565,15 +606,16 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
 
         return Card(
           child: ListTile(
-            leading: Icon(Icons.camera_alt, color: Colors.green),
-            title: Text('실시간 식물 사진 보기'),
-            subtitle: Text('최근 업데이트: ${DateTime.now().toString().substring(11, 16)}'),
+            leading: const Icon(Icons.camera_alt, color: Colors.green),
+            title: const Text('실시간 식물 사진 보기'),
+            subtitle:
+                Text('최근 업데이트: ${DateTime.now().toString().substring(11, 16)}'),
             onTap: () {
               if (imageData.startsWith('data:image')) {
                 _showCameraImageDialog(context, imageData);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('유효하지 않은 이미지 데이터입니다.')),
+                  const SnackBar(content: Text('유효하지 않은 이미지 데이터입니다.')),
                 );
               }
             },
@@ -582,4 +624,4 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
       },
     );
   }
-} 
+}
