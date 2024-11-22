@@ -319,7 +319,6 @@ class _PlantStatusScreenState extends State<PlantStatusScreen> with SingleTicker
       future: _apiService.getPlantDetails(
         widget.plant['name'],
         scientificName: widget.plant['scientificName'],
-        englishName: widget.plant['englishName'],
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
