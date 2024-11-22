@@ -55,6 +55,56 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
+          IconButton(
+            icon: const Icon(Icons.sync),
+            onPressed: () async {
+              try {
+                final apiService = NongsaroApiService();
+                
+                // 로딩 표시
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          color: Colors.white,
+                          child: Text('농사로 식물 목록을 업데이트하는 중...'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+
+                // 모든 단계 실행
+                await apiService.fetchAndSavePlantList();      // 1단계
+                await apiService.fetchAndSaveScientificNames(); // 2단계
+                await apiService.renameFoldersToScientificNames(); // 3단계
+                
+                // 로딩 닫기
+                Navigator.pop(context);
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('식물 목록이 성공적으로 업데이트되었습니다')),
+                );
+              } catch (e) {
+                // 로딩 닫기
+                Navigator.pop(context);
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('오류가 발생했습니다: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
       body: Column(

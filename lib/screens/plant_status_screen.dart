@@ -414,56 +414,52 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
     final NongsaroApiService apiService = NongsaroApiService();
 
     return FutureBuilder<Map<String, dynamic>?>(
-      future: apiService.getPlantDetails(
-        widget.plant['name'],
-        scientificName: widget.plant['scientificName'],
-      ),
+      future: apiService.getPlantDetails(widget.plant['name']),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
+          print('식물 정보 조회 오류: ${snapshot.error}');
           return const Center(child: Text('식물 정보를 불러오는데 실패했습니다.'));
         }
 
-        final plantDetails = snapshot.data ??
-            {
-              'koreanName': '-',
-              'scientificName': '-',
-              'englishName': '-',
-              'familyName': '-',
-              'origin': '-',
-              'growthHeight': '-',
-              'growthWidth': '-',
-              'leafInfo': '-',
-              'flowerInfo': '-',
-              'managementLevel': '-',
-              'lightDemand': '-',
-              'waterCycle': {
-                'spring': '-',
-                'summer': '-',
-                'autumn': '-',
-                'winter': '-',
-              },
-              'temperature': {
-                'growth': '-',
-                'winter': '-',
-              },
-              'humidity': '-',
-              'specialManagement': '-',
-              'toxicity': '-',
-            };
+        final plantDetails = snapshot.data ?? {
+          'koreanName': '-',
+          'scientificName': '-',
+          'englishName': '-',
+          'familyName': '-',
+          'origin': '-',
+          'growthHeight': '-',
+          'growthWidth': '-',
+          'leafInfo': '-',
+          'flowerInfo': '-',
+          'managementLevel': '-',
+          'lightDemand': '-',
+          'waterCycle': {
+            'spring': '-',
+            'summer': '-',
+            'autumn': '-',
+            'winter': '-',
+          },
+          'temperature': {
+            'growth': '-',
+            'winter': '-',
+          },
+          'humidity': '-',
+          'specialManagement': '-',
+          'toxicity': '-',
+        };
 
         if (snapshot.data == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('식물 정보를 찾을 수 없습니다.'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          });
+          print('식물 정보를 찾을 수 없음: ${widget.plant['name']}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('식물 정보를 찾을 수 없습니다.'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
 
         return SingleChildScrollView(
@@ -471,12 +467,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '기본 정보',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              _buildInfoSection('식물명', [
+              _buildInfoSection('기본 정보', [
                 _buildInfoRow('한글명', plantDetails['koreanName']),
                 _buildInfoRow('영문명', plantDetails['englishName']),
                 _buildInfoRow('학명', plantDetails['scientificName']),
