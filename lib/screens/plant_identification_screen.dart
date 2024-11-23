@@ -197,179 +197,316 @@ class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
     }
   }
 
-  Widget _buildAnalysisResult() {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('AI 식물 분석'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.black),
-        titleTextStyle: TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'AI가 당신이 촬영한 사진을 기반으로 식물을 분석해봤어요!',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              SizedBox(height: 16),
-              AspectRatio(
-                aspectRatio: 1,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(selectedImagePath!),
-                    fit: BoxFit.cover,
+  void _showPlantInfo(BuildContext context, Map<String, dynamic> result) async {
+    try {
+      // 로딩 표시
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      // Plant.id가 예측한 식물 이름으로 농사로 API에서 정보 가져오기
+      final plantInfo = await _apiService.getPlantDetails(
+        result['name'],
+        scientificName: result['name'], // Plant.id는 학명을 반환
+      );
+
+      // 로딩 다이얼로그 닫기
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      if (plantInfo != null) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return Dialog(
+              child: Container(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppBar(
+                        title: Text('식물 정보'),
+                        leading: IconButton(
+                          icon: Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                      if (plantInfo['images'] != null && 
+                          (plantInfo['images'] as List).isNotEmpty)
+                        Container(
+                          height: 200,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: (plantInfo['images'] as List).length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    plantInfo['images'][index],
+                                    width: 200,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'AI 분석 결과',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text('예측 정확도: ${(result['probability'] * 100).toStringAsFixed(1)}%'),
+                            SizedBox(height: 16),
+                            _buildInfoSection('기본 정보', [
+                              _buildInfoRow('한글명', plantInfo['koreanName'] ?? '-'),
+                              _buildInfoRow('영문명', plantInfo['englishName'] ?? '-'),
+                              _buildInfoRow('학명', plantInfo['scientificName'] ?? '-'),
+                              _buildInfoRow('과명', plantInfo['familyName'] ?? '-'),
+                              _buildInfoRow('원산지', plantInfo['origin'] ?? '-'),
+                            ]),
+                            _buildInfoSection('생육 정보', [
+                              _buildInfoRow('성장 높이', plantInfo['growthHeight'] ?? '-'),
+                              _buildInfoRow('성장 너비', plantInfo['growthWidth'] ?? '-'),
+                              _buildInfoRow('잎 특성', plantInfo['leafInfo'] ?? '-'),
+                              _buildInfoRow('꽃 특성', plantInfo['flowerInfo'] ?? '-'),
+                            ]),
+                            _buildInfoSection('관리 방법', [
+                              _buildInfoRow('관리 난이도', plantInfo['managementLevel'] ?? '-'),
+                              _buildInfoRow('빛 요구도', plantInfo['lightDemand'] ?? '-'),
+                              _buildInfoRow('생육 온도', plantInfo['temperature']['growth'] ?? '-'),
+                              _buildInfoRow('겨울 최저온도', plantInfo['temperature']['winter'] ?? '-'),
+                              _buildInfoRow('습도', plantInfo['humidity'] ?? '-'),
+                            ]),
+                            _buildInfoSection('물 주기', [
+                              _buildInfoRow('봄', plantInfo['waterCycle']['spring'] ?? '-'),
+                              _buildInfoRow('여름', plantInfo['waterCycle']['summer'] ?? '-'),
+                              _buildInfoRow('가을', plantInfo['waterCycle']['autumn'] ?? '-'),
+                              _buildInfoRow('겨울', plantInfo['waterCycle']['winter'] ?? '-'),
+                            ]),
+                            if (plantInfo['specialManagement']?.isNotEmpty ?? false)
+                              _buildInfoSection('특별 관리', [
+                                Text(plantInfo['specialManagement']),
+                              ]),
+                            if (plantInfo['toxicity']?.isNotEmpty ?? false)
+                              _buildInfoSection('독성 정보', [
+                                Text(plantInfo['toxicity']),
+                              ]),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                ),
+                                child: Text(
+                                  '이 식물로 등록하기',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(context); // 다이얼로그 닫기
+                                  _registerPlant({
+                                    'name': result['name'],
+                                    'imagePath': selectedImagePath,
+                                    'probability': result['probability'].toString(),
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              SizedBox(height: 16),
-              if (analysisResults != null && analysisResults!.isNotEmpty)
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
-                  itemCount: analysisResults!.length,
-                  itemBuilder: (context, index) {
-                    final result = analysisResults![index];
-                    return FutureBuilder<Map<String, String?>>(
-                      future: getWikipediaInfo(result['name'].toString().replaceAll(' ', '_')),
-                      builder: (context, snapshot) {
-                        return Card(
-                          child: ExpansionTile(
-                            leading: snapshot.hasData && snapshot.data!['image'] != null
-                                ? SizedBox(
-                                    width: 50,
-                                    height: 50,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: Image.network(
-                                        snapshot.data!['image']!,
-                                        width: 50,
-                                        height: 50,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                            Icon(Icons.image_not_supported),
-                                      ),
-                                    ),
-                                  )
-                                : SizedBox(
-                                    width: 50,
-                                    height: 50,
-                                    child: Center(child: CircularProgressIndicator()),
-                                  ),
-                            title: FutureBuilder<Map<String, dynamic>?>(
-                              future: _apiService.getPlantDetails(result['name']),
-                              builder: (context, apiSnapshot) {
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      result['name'],
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                    if (apiSnapshot.hasData && apiSnapshot.data?['koreanName'] != null)
-                                      Text(
-                                        apiSnapshot.data!['koreanName'],
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      )
-                                    else if (snapshot.hasData && snapshot.data!['koreanName'] != null)
-                                      Text(
-                                        snapshot.data!['koreanName']!,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    Text(
-                                      '유사도: ${(result['probability'] * 100).toStringAsFixed(1)}%',
-                                      style: TextStyle(color: Colors.grey[600]),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
+            );
+          },
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('식물 정보를 찾을 수 없습니다')),
+        );
+      }
+    } catch (e) {
+      print('식물 정보 로딩 오류: $e');
+      if (!mounted) return;
+      Navigator.pop(context); // 로딩 다이얼로그 닫기
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('식물 정보를 불러오는 중 오류가 발생했습니다')),
+      );
+    }
+  }
+
+  Widget _buildInfoSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        SizedBox(height: 8),
+        ...children,
+        SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalysisResult() {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('AI 식물 분석'),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(selectedImagePath!),
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            if (analysisResults != null)
+              ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: analysisResults!.length,
+                itemBuilder: (context, index) {
+                  final result = analysisResults![index];
+                  return Card(
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ExpansionTile(
+                      leading: FutureBuilder<Map<String, String?>>(
+                        future: getWikipediaInfo(result['name']),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data!['image'] != null) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.network(
+                                snapshot.data!['image']!,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              ),
+                            );
+                          }
+                          return Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[300],
+                            child: Icon(Icons.image_not_supported),
+                          );
+                        },
+                      ),
+                      title: Text(
+                        result['name'],
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '유사도: ${(result['probability'] * 100).toStringAsFixed(1)}%',
+                      ),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        child: Text('식물 정보 보기'),
-                                        onPressed: () async {
-                                          final plantInfo = await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => PlantDetailScreen(
-                                                plantName: result['name'],
-                                                imagePath: selectedImagePath!,
-                                                probability: result['probability'].toString(),
-                                                scientificName: result['scientific_name'],
-                                              ),
-                                            ),
-                                          );
-                                          if (plantInfo != null) {
-                                            Navigator.pop(context, plantInfo);
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                        ),
-                                        child: Text(
-                                          '이 식물로 등록하기',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                        onPressed: () {
-                                          _registerPlant({
-                                            'name': result['name'],
-                                            'imagePath': selectedImagePath,
-                                            'probability': result['probability'].toString(),
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
+                              Expanded(
+                                child: OutlinedButton(
+                                  child: Text('식물 정보 보기'),
+                                  onPressed: () => _showPlantInfo(context, result),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                  ),
+                                  child: Text(
+                                    '이 식물로 등록하기',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  onPressed: () {
+                                    _registerPlant({
+                                      'name': result['name'],
+                                      'imagePath': selectedImagePath,
+                                      'probability': result['probability'].toString(),
+                                    });
+                                  },
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      },
-                    );
-                  },
-                ),
-            ],
-          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
       ),
     );

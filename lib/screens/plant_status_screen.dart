@@ -446,40 +446,79 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
               ),
             ),
           SizedBox(height: 16),
+          
+          // 기본 정보
           _buildInfoSection('기본 정보', [
-            _buildInfoRow('한글명', plantInfo['koreanName'] ?? '-'),
-            _buildInfoRow('영문명', plantInfo['englishName'] ?? '-'),
-            _buildInfoRow('학명', plantInfo['scientificName'] ?? '-'),
-            _buildInfoRow('과명', plantInfo['familyName'] ?? '-'),
-            _buildInfoRow('원산지', plantInfo['origin'] ?? '-'),
+            if (plantInfo['koreanName'] != null) _buildInfoRow('한글명', plantInfo['koreanName']),
+            if (plantInfo['englishName'] != null) _buildInfoRow('영문명', plantInfo['englishName']),
+            if (plantInfo['scientificName'] != null) _buildInfoRow('학명', plantInfo['scientificName']),
+            if (plantInfo['familyCode'] != null) _buildInfoRow('과명', plantInfo['familyCode']),
+            if (plantInfo['origin'] != null) _buildInfoRow('원산지', plantInfo['origin']),
+            if (plantInfo['classification'] != null) _buildInfoRow('분류', plantInfo['classification']),
+            if (plantInfo['growthType'] != null) _buildInfoRow('생육형태', plantInfo['growthType']),
+            if (plantInfo['ecologyType'] != null) _buildInfoRow('생태', plantInfo['ecologyType']),
           ]),
-          _buildInfoSection('생육 정보', [
-            _buildInfoRow('성장 높이', plantInfo['growthHeight'] ?? '-'),
-            _buildInfoRow('성장 너비', plantInfo['growthWidth'] ?? '-'),
-            _buildInfoRow('생장 속도', plantInfo['growthSpeed'] ?? '-'),
-            _buildInfoRow('잎 특성', plantInfo['leafInfo'] ?? '-'),
-            _buildInfoRow('꽃 특성', plantInfo['flowerInfo'] ?? '-'),
-          ]),
-          _buildInfoSection('관리 방법', [
-            _buildInfoRow('관리 난이도', plantInfo['managementLevel'] ?? '-'),
-            _buildInfoRow('빛 요구도', plantInfo['lightDemand'] ?? '-'),
-            _buildInfoRow('생육 온도', plantInfo['temperature']['growth'] ?? '-'),
-            _buildInfoRow('겨울 최저온도', plantInfo['temperature']['winter'] ?? '-'),
-            _buildInfoRow('습도', plantInfo['humidity'] ?? '-'),
-            _buildInfoRow('비료', plantInfo['fertilizer'] ?? '-'),
-            _buildInfoRow('토양', plantInfo['soil'] ?? '-'),
-          ]),
-          _buildInfoSection('물 주기', [
-            _buildInfoRow('봄', plantInfo['waterCycle']['spring'] ?? '-'),
-            _buildInfoRow('여름', plantInfo['waterCycle']['summer'] ?? '-'),
-            _buildInfoRow('가을', plantInfo['waterCycle']['autumn'] ?? '-'),
-            _buildInfoRow('겨울', plantInfo['waterCycle']['winter'] ?? '-'),
-          ]),
-          if (plantInfo['specialManagement']?.isNotEmpty ?? false)
-            _buildInfoSection('특별 관리', [
-              Text(plantInfo['specialManagement']),
+
+          // 생육 정보
+          if (plantInfo['growthInfo'] != null && (plantInfo['growthInfo'] as Map).isNotEmpty)
+            _buildInfoSection('생육 정보', [
+              if (plantInfo['growthInfo']['height'] != null) 
+                _buildInfoRow('성장 높이', plantInfo['growthInfo']['height']),
+              if (plantInfo['growthInfo']['width'] != null) 
+                _buildInfoRow('성장 너비', plantInfo['growthInfo']['width']),
             ]),
-          if (plantInfo['toxicity']?.isNotEmpty ?? false)
+
+          // 관리 정보
+          if (plantInfo['managementInfo'] != null && (plantInfo['managementInfo'] as Map).isNotEmpty)
+            _buildInfoSection('관리 방법', [
+              if (plantInfo['managementInfo']['level'] != null)
+                _buildInfoRow('관리 난이도', plantInfo['managementInfo']['level']),
+              if (plantInfo['managementInfo']['demand'] != null)
+                _buildInfoRow('관리요구도', plantInfo['managementInfo']['demand']),
+              if (plantInfo['managementInfo']['special'] != null)
+                _buildInfoRow('특별관리', plantInfo['managementInfo']['special']),
+            ]),
+
+          // 환경 정보
+          if (plantInfo['environmentInfo'] != null && (plantInfo['environmentInfo'] as Map).isNotEmpty)
+            _buildInfoSection('환경 정보', [
+              if (plantInfo['environmentInfo']['light'] != null)
+                _buildInfoRow('빛 요구도', plantInfo['environmentInfo']['light']),
+              if (plantInfo['environmentInfo']['humidity'] != null)
+                _buildInfoRow('습도', plantInfo['environmentInfo']['humidity']),
+              if (plantInfo['environmentInfo']['growthTemperature'] != null)
+                _buildInfoRow('생육 온도', plantInfo['environmentInfo']['growthTemperature']),
+              if (plantInfo['environmentInfo']['winterTemperature'] != null)
+                _buildInfoRow('겨울 최저온도', plantInfo['environmentInfo']['winterTemperature']),
+            ]),
+
+          // 물 주기 정보
+          if (plantInfo['waterCycle'] != null && (plantInfo['waterCycle'] as Map).isNotEmpty)
+            _buildInfoSection('물 주기', [
+              if (plantInfo['waterCycle']['spring'] != null)
+                _buildInfoRow('봄', plantInfo['waterCycle']['spring']),
+              if (plantInfo['waterCycle']['summer'] != null)
+                _buildInfoRow('여름', plantInfo['waterCycle']['summer']),
+              if (plantInfo['waterCycle']['autumn'] != null)
+                _buildInfoRow('가을', plantInfo['waterCycle']['autumn']),
+              if (plantInfo['waterCycle']['winter'] != null)
+                _buildInfoRow('겨울', plantInfo['waterCycle']['winter']),
+            ]),
+
+          // 기능성 정보
+          if (plantInfo['functionInfo'] != null)
+            _buildInfoSection('기능성 정보', [
+              Text(plantInfo['functionInfo']),
+            ]),
+
+          // 병충해 관리 정보
+          if (plantInfo['pestControlInfo'] != null)
+            _buildInfoSection('병충해 관리', [
+              Text(plantInfo['pestControlInfo']),
+            ]),
+
+          // 독성 정보
+          if (plantInfo['toxicity'] != null)
             _buildInfoSection('독성 정보', [
               Text(plantInfo['toxicity']),
             ]),
@@ -674,7 +713,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           child: ListTile(
             leading: const Icon(Icons.note_alt, color: Colors.green),
             title: const Text('성장 보고서'),
-            subtitle: const Text('식물의 성장 과정을 기록해보세요'),
+            subtitle: const Text('식물의 성장 과정을 기록해보세요!'),
             onTap: () => _showGrowthReportDialog(),
           ),
         ),
@@ -692,7 +731,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
               return const Card(
                 child: Padding(
                   padding: EdgeInsets.all(16.0),
-                  child: Text('아�� 작성된 성장 보고서가 없습니다'),
+                  child: Text('아직 작성된 성장 보고서가 없습니다'),
                 ),
               );
             }
@@ -887,7 +926,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                       .child('reports');
 
                   if (existingReport != null && reportId != null) {
-                    // 기존 보고서 수정
+                    // 기존 보��서 수정
                     await reportsRef.child(reportId).update({
                       'title': title,
                       'content': reportContent,

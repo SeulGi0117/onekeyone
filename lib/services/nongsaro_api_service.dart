@@ -85,33 +85,72 @@ class NongsaroApiService {
           if (detailItems.isNotEmpty) {
             final detailItem = detailItems.first;
 
-            return {
-              'koreanName': nongsaroPlantName, // nongsaroPlantsList에서 가져온 한글명 사용
-              'scientificName': _getElementText(detailItem, 'plntbneNm'),
-              'englishName': _getElementText(detailItem, 'plntzrNm'),
-              'familyName': _getElementText(detailItem, 'fmlNm'),
-              'origin': _getElementText(detailItem, 'orgplceInfo'),
-              'growthHeight': _getElementText(detailItem, 'growthHgInfo'),
-              'growthWidth': _getElementText(detailItem, 'growthAraInfo'),
-              'leafInfo': _getElementText(detailItem, 'lefStleInfo'),
-              'flowerInfo': _getElementText(detailItem, 'flwrInfo'),
-              'managementLevel': _getElementText(detailItem, 'managelevelCodeNm'),
-              'lightDemand': _getElementText(detailItem, 'lighttdemanddoCodeNm'),
-              'waterCycle': {
-                'spring': _getElementText(detailItem, 'watercycleSprngCodeNm'),
-                'summer': _getElementText(detailItem, 'watercycleSummerCodeNm'),
-                'autumn': _getElementText(detailItem, 'watercycleAutumnCodeNm'),
-                'winter': _getElementText(detailItem, 'watercycleWinterCodeNm'),
-              },
-              'temperature': {
-                'growth': _getElementText(detailItem, 'grwhTpCodeNm'),
-                'winter': _getElementText(detailItem, 'winterLwetTpCodeNm'),
-              },
-              'humidity': _getElementText(detailItem, 'hdCodeNm'),
-              'specialManagement': _getElementText(detailItem, 'speclmanageInfo'),
-              'toxicity': _getElementText(detailItem, 'toxctyInfo'),
-              'images': imageUrls, // 농사로 이미지 URL 목록 추가
-            };
+            // 모든 정보를 가져오되, 빈 값은 제외
+            Map<String, dynamic> details = {};
+
+            // 기본 정보
+            _addIfNotEmpty(details, 'koreanName', nongsaroPlantName);
+            _addIfNotEmpty(details, 'scientificName', _getElementText(detailItem, 'plntbneNm'));
+            _addIfNotEmpty(details, 'englishName', _getElementText(detailItem, 'plntzrNm'));
+            _addIfNotEmpty(details, 'familyCode', _getElementText(detailItem, 'fmlCodeNm')); // 과명 코드
+            _addIfNotEmpty(details, 'distributionName', _getElementText(detailItem, 'distbNm'));
+            _addIfNotEmpty(details, 'origin', _getElementText(detailItem, 'orgplceInfo'));
+            _addIfNotEmpty(details, 'classification', _getElementText(detailItem, 'clCodeNm')); // 분류
+            _addIfNotEmpty(details, 'growthType', _getElementText(detailItem, 'grwhstleCodeNm')); // 생육형태
+            _addIfNotEmpty(details, 'ecologyType', _getElementText(detailItem, 'eclgyCodeNm')); // 생태 정보
+
+            // 생육 정보
+            Map<String, dynamic> growthInfo = {};
+            _addIfNotEmpty(growthInfo, 'height', _getElementText(detailItem, 'growthHgInfo'));
+            _addIfNotEmpty(growthInfo, 'width', _getElementText(detailItem, 'growthAraInfo'));
+            if (growthInfo.isNotEmpty) {
+              details['growthInfo'] = growthInfo;
+            }
+
+            // 관리 정보
+            Map<String, dynamic> managementInfo = {};
+            _addIfNotEmpty(managementInfo, 'level', _getElementText(detailItem, 'managelevelCodeNm'));
+            _addIfNotEmpty(managementInfo, 'demand', _getElementText(detailItem, 'managedemanddoCodeNm')); // 관리요구도
+            _addIfNotEmpty(managementInfo, 'special', _getElementText(detailItem, 'speclmanageInfo'));
+            if (managementInfo.isNotEmpty) {
+              details['managementInfo'] = managementInfo;
+            }
+
+            // 환경 정보
+            Map<String, dynamic> environmentInfo = {};
+            _addIfNotEmpty(environmentInfo, 'light', _getElementText(detailItem, 'lighttdemanddoCodeNm'));
+            _addIfNotEmpty(environmentInfo, 'humidity', _getElementText(detailItem, 'hdCodeNm'));
+            _addIfNotEmpty(environmentInfo, 'growthTemperature', _getElementText(detailItem, 'grwhTpCodeNm'));
+            _addIfNotEmpty(environmentInfo, 'winterTemperature', _getElementText(detailItem, 'winterLwetTpCodeNm'));
+            if (environmentInfo.isNotEmpty) {
+              details['environmentInfo'] = environmentInfo;
+            }
+
+            // 물 주기 정보
+            Map<String, dynamic> waterCycle = {};
+            _addIfNotEmpty(waterCycle, 'spring', _getElementText(detailItem, 'watercycleSprngCodeNm'));
+            _addIfNotEmpty(waterCycle, 'summer', _getElementText(detailItem, 'watercycleSummerCodeNm'));
+            _addIfNotEmpty(waterCycle, 'autumn', _getElementText(detailItem, 'watercycleAutumnCodeNm'));
+            _addIfNotEmpty(waterCycle, 'winter', _getElementText(detailItem, 'watercycleWinterCodeNm'));
+            if (waterCycle.isNotEmpty) {
+              details['waterCycle'] = waterCycle;
+            }
+
+            // 기능성 정보
+            _addIfNotEmpty(details, 'functionInfo', _getElementText(detailItem, 'fncltyInfo'));
+            
+            // 병충해 관리 정보
+            _addIfNotEmpty(details, 'pestControlInfo', _getElementText(detailItem, 'dlthtsManageInfo'));
+
+            // 독성 정보
+            _addIfNotEmpty(details, 'toxicity', _getElementText(detailItem, 'toxctyInfo'));
+
+            // 이미지 URL 추가
+            if (imageUrls.isNotEmpty) {
+              details['images'] = imageUrls;
+            }
+
+            return details;
           }
         }
       }
@@ -134,6 +173,12 @@ class NongsaroApiService {
       return item.findElements(elementName).first.text;
     } catch (e) {
       return '';
+    }
+  }
+
+  void _addIfNotEmpty(Map<String, dynamic> map, String key, String value) {
+    if (value.isNotEmpty) {
+      map[key] = value;
     }
   }
 }
