@@ -389,11 +389,229 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                         '건강함',
                         Colors.green,
                       ),
-                      _buildHealthRow(
-                        Icons.water_drop,
-                        '토양 수분 정도',
-                        '적정 수준',
-                        Colors.blue,
+                      // 온도 상태
+                      StreamBuilder<DatabaseEvent>(
+                        stream: _sensorStream,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData ||
+                              snapshot.data?.snapshot.value == null) {
+                            return _buildHealthRow(
+                              Icons.thermostat,
+                              '온도 상태',
+                              '측정중...',
+                              Colors.grey,
+                            );
+                          }
+
+                          final sensorData = Map<String, dynamic>.from(
+                              snapshot.data!.snapshot.value as Map);
+                          final temperature = double.tryParse(sensorData['온도']
+                                  .toString()
+                                  .replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                              0.0;
+
+                          final plantInfo = widget.plant['plantInfo'];
+                          if (plantInfo == null ||
+                              plantInfo['environmentInfo'] == null) {
+                            return _buildHealthRow(
+                              Icons.thermostat,
+                              '온도 상태',
+                              '${temperature.toStringAsFixed(1)}°C',
+                              Colors.blue,
+                            );
+                          }
+
+                          // 온도 범위 파싱 (예: "18~25°C" -> [18, 25])
+                          final temperatureRange = plantInfo['environmentInfo']
+                                  ['growthTemperature']
+                              .toString()
+                              .replaceAll(RegExp(r'[^0-9~]'), '')
+                              .split('~')
+                              .map((s) => double.tryParse(s) ?? 0.0)
+                              .toList();
+
+                          if (temperatureRange.length != 2) {
+                            return _buildHealthRow(
+                              Icons.thermostat,
+                              '온도 상태',
+                              '${temperature.toStringAsFixed(1)}°C',
+                              Colors.blue,
+                            );
+                          }
+
+                          final minTemp = temperatureRange[0];
+                          final maxTemp = temperatureRange[1];
+
+                          Color statusColor;
+                          String statusText;
+                          String additionalInfo;
+
+                          if (temperature < minTemp) {
+                            statusColor = Colors.orange;
+                            statusText = '적정수준 미달';
+                            additionalInfo =
+                                '권장 온도: ${minTemp.toStringAsFixed(0)}~${maxTemp.toStringAsFixed(0)}°C';
+                          } else if (temperature > maxTemp) {
+                            statusColor = Colors.red;
+                            statusText = '적정수준 초과';
+                            additionalInfo =
+                                '권장 온도: ${minTemp.toStringAsFixed(0)}~${maxTemp.toStringAsFixed(0)}°C';
+                          } else {
+                            statusColor = Colors.blue;
+                            statusText = '적정수준';
+                            additionalInfo = '현재 온도가 적정 범위 내에 있습니다';
+                          }
+
+                          return _buildHealthRow(
+                            Icons.thermostat,
+                            '온도 상태',
+                            statusText,
+                            statusColor,
+                            additionalInfo:
+                                '현재 온도: ${temperature.toStringAsFixed(1)}°C (${minTemp.toStringAsFixed(0)}~${maxTemp.toStringAsFixed(0)}°C)',
+                          );
+                        },
+                      ),
+                      // 조도 상태 (온도 다음으로 이동)
+                      StreamBuilder<DatabaseEvent>(
+                        stream: _sensorStream,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData ||
+                              snapshot.data?.snapshot.value == null) {
+                            return _buildHealthRow(
+                              Icons.wb_sunny,
+                              '조도 상태',
+                              '측정중...',
+                              Colors.grey,
+                            );
+                          }
+
+                          final sensorData = Map<String, dynamic>.from(
+                              snapshot.data!.snapshot.value as Map);
+                          final lightValue = double.tryParse(sensorData['조도']
+                                  .toString()
+                                  .replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                              0.0;
+
+                          // 조도 범위 설정 (800~10000 lux)
+                          const minLight = 800.0;
+                          const maxLight = 10000.0;
+
+                          Color statusColor;
+                          String statusText;
+                          String additionalInfo;
+
+                          if (lightValue < minLight) {
+                            statusColor = Colors.orange; // 미달
+                            statusText = '적정수준 미달';
+                            additionalInfo =
+                                '권장 조도: ${minLight.toStringAsFixed(0)}~${maxLight.toStringAsFixed(0)} lux';
+                          } else if (lightValue > maxLight) {
+                            statusColor = Colors.red; // 초과
+                            statusText = '적정수준 초과';
+                            additionalInfo =
+                                '권장 조도: ${minLight.toStringAsFixed(0)}~${maxLight.toStringAsFixed(0)} lux';
+                          } else {
+                            statusColor = Colors.blue; // 적정
+                            statusText = '적정수준';
+                            additionalInfo = '현재 조도가 적정 범위 내에 있습니다';
+                          }
+
+                          return _buildHealthRow(
+                            Icons.wb_sunny,
+                            '조도 상태',
+                            statusText,
+                            statusColor,
+                            additionalInfo:
+                                '현재 조도: ${lightValue.toStringAsFixed(1)} lux (${minLight.toStringAsFixed(0)}~${maxLight.toStringAsFixed(0)} lux)',
+                          );
+                        },
+                      ),
+                      // 토양 수분 상태
+                      StreamBuilder<DatabaseEvent>(
+                        stream: _sensorStream,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData ||
+                              snapshot.data?.snapshot.value == null) {
+                            return _buildHealthRow(
+                              Icons.water_drop,
+                              '토양 수분 상태',
+                              '측정중...',
+                              Colors.grey,
+                            );
+                          }
+
+                          final sensorData = Map<String, dynamic>.from(
+                              snapshot.data!.snapshot.value as Map);
+                          final soilMoisture = double.tryParse(
+                                  sensorData['토양습도']
+                                      .toString()
+                                      .replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                              0.0;
+
+                          final plantInfo = widget.plant['plantInfo'];
+                          if (plantInfo == null ||
+                              plantInfo['environmentInfo'] == null) {
+                            return _buildHealthRow(
+                              Icons.water_drop,
+                              '토양 수분 상태',
+                              '${soilMoisture.toStringAsFixed(1)}%',
+                              Colors.blue,
+                            );
+                          }
+
+                          // 습도 범위 파싱 (예: "60~70%" -> [60, 70])
+                          final humidityRange = plantInfo['environmentInfo']
+                                  ['humidity']
+                              .toString()
+                              .replaceAll(RegExp(r'[^0-9~]'), '')
+                              .split('~')
+                              .map((s) => double.tryParse(s) ?? 0.0)
+                              .toList();
+
+                          if (humidityRange.length != 2) {
+                            return _buildHealthRow(
+                              Icons.water_drop,
+                              '토양 수분 상태',
+                              '${soilMoisture.toStringAsFixed(1)}%',
+                              Colors.blue,
+                            );
+                          }
+
+                          final minHumidity = humidityRange[0];
+                          final maxHumidity = humidityRange[1];
+
+                          Color statusColor;
+                          String statusText;
+                          String additionalInfo;
+
+                          if (soilMoisture < minHumidity) {
+                            statusColor = Colors.orange;
+                            statusText = '적정수준 미달';
+                            additionalInfo =
+                                '권장 습도: ${minHumidity.toStringAsFixed(0)}~${maxHumidity.toStringAsFixed(0)}%';
+                          } else if (soilMoisture > maxHumidity) {
+                            statusColor = Colors.red;
+                            statusText = '적정수준 초과';
+                            additionalInfo =
+                                '권장 습도: ${minHumidity.toStringAsFixed(0)}~${maxHumidity.toStringAsFixed(0)}%';
+                          } else {
+                            statusColor = Colors.blue;
+                            statusText = '적정수준';
+                            additionalInfo = '현재 습도가 적정 범위 내에 있습니다';
+                          }
+
+                          return _buildHealthRow(
+                            Icons.water_drop,
+                            '토양 수분 상태',
+                            statusText,
+                            statusColor == Colors.blue
+                                ? Colors.blue
+                                : statusColor,
+                            additionalInfo:
+                                '현재 습도: ${soilMoisture.toStringAsFixed(1)}% (${minHumidity.toStringAsFixed(0)}~${maxHumidity.toStringAsFixed(0)}%)',
+                          );
+                        },
                       ),
                       _buildHealthRow(
                         Icons.calendar_today,
@@ -414,18 +632,19 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
 
   Widget _buildPlantInfoTab() {
     final plantInfo = widget.plant['plantInfo'] as Map<String, dynamic>?;
-    
+
     if (plantInfo == null) {
-      return Center(child: Text('식물 정보를 찾을 수 없습니다'));
+      return const Center(child: Text('식물 정보를 찾을 수 없습니다'));
     }
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (plantInfo['images'] != null && (plantInfo['images'] as List).isNotEmpty)
-            Container(
+          if (plantInfo['images'] != null &&
+              (plantInfo['images'] as List).isNotEmpty)
+            SizedBox(
               height: 200,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -445,26 +664,35 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 },
               ),
             ),
-          SizedBox(height: 16),
-          
+          const SizedBox(height: 16),
+
           // 기본 정보
           _buildInfoSection('기본 정보', [
-            if (plantInfo['koreanName'] != null) _buildInfoRow('한글명', plantInfo['koreanName']),
-            if (plantInfo['englishName'] != null) _buildInfoRow('영문명', plantInfo['englishName']),
-            if (plantInfo['scientificName'] != null) _buildInfoRow('학명', plantInfo['scientificName']),
-            if (plantInfo['familyCode'] != null) _buildInfoRow('과명', plantInfo['familyCode']),
-            if (plantInfo['origin'] != null) _buildInfoRow('원산지', plantInfo['origin']),
-            if (plantInfo['classification'] != null) _buildInfoRow('분류', plantInfo['classification']),
-            if (plantInfo['growthType'] != null) _buildInfoRow('생육형태', plantInfo['growthType']),
-            if (plantInfo['ecologyType'] != null) _buildInfoRow('생태', plantInfo['ecologyType']),
+            if (plantInfo['koreanName'] != null)
+              _buildInfoRow('한글명', plantInfo['koreanName']),
+            if (plantInfo['englishName'] != null)
+              _buildInfoRow('영문명', plantInfo['englishName']),
+            if (plantInfo['scientificName'] != null)
+              _buildInfoRow('학명', plantInfo['scientificName']),
+            if (plantInfo['familyCode'] != null)
+              _buildInfoRow('과명', plantInfo['familyCode']),
+            if (plantInfo['origin'] != null)
+              _buildInfoRow('원산지', plantInfo['origin']),
+            if (plantInfo['classification'] != null)
+              _buildInfoRow('분류', plantInfo['classification']),
+            if (plantInfo['growthType'] != null)
+              _buildInfoRow('생육형태', plantInfo['growthType']),
+            if (plantInfo['ecologyType'] != null)
+              _buildInfoRow('생태', plantInfo['ecologyType']),
           ]),
 
           // 생육 정보
-          if (plantInfo['growthInfo'] != null && (plantInfo['growthInfo'] as Map).isNotEmpty)
+          if (plantInfo['growthInfo'] != null &&
+              (plantInfo['growthInfo'] as Map).isNotEmpty)
             _buildInfoSection('생육 정보', [
-              if (plantInfo['growthInfo']['height'] != null) 
+              if (plantInfo['growthInfo']['height'] != null)
                 _buildInfoRow('성장 높이', plantInfo['growthInfo']['height']),
-              if (plantInfo['growthInfo']['width'] != null) 
+              if (plantInfo['growthInfo']['width'] != null)
                 _buildInfoRow('성장 너비', plantInfo['growthInfo']['width']),
               if (plantInfo['leafPattern'] != null)
                 _buildInfoRow('잎무늬', plantInfo['leafPattern']),
@@ -473,7 +701,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
             ]),
 
           // 관리 정보
-          if (plantInfo['managementInfo'] != null && (plantInfo['managementInfo'] as Map).isNotEmpty)
+          if (plantInfo['managementInfo'] != null &&
+              (plantInfo['managementInfo'] as Map).isNotEmpty)
             _buildInfoSection('관리 방법', [
               if (plantInfo['managementInfo']['level'] != null)
                 _buildInfoRow('관리 난이도', plantInfo['managementInfo']['level']),
@@ -486,7 +715,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
             ]),
 
           // 병충해 정보 섹션 추가 (기존 병충해 관리 정보와 함께 표시)
-          if (plantInfo['pestInfo'] != null || plantInfo['pestControlInfo'] != null)
+          if (plantInfo['pestInfo'] != null ||
+              plantInfo['pestControlInfo'] != null)
             _buildInfoSection('병충해 정보', [
               if (plantInfo['pestInfo'] != null)
                 _buildInfoRow('발생 병충해', plantInfo['pestInfo']),
@@ -495,20 +725,24 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
             ]),
 
           // 환경 정보
-          if (plantInfo['environmentInfo'] != null && (plantInfo['environmentInfo'] as Map).isNotEmpty)
+          if (plantInfo['environmentInfo'] != null &&
+              (plantInfo['environmentInfo'] as Map).isNotEmpty)
             _buildInfoSection('환경 정보', [
               if (plantInfo['environmentInfo']['light'] != null)
                 _buildInfoRow('빛 요구도', plantInfo['environmentInfo']['light']),
               if (plantInfo['environmentInfo']['humidity'] != null)
                 _buildInfoRow('습도', plantInfo['environmentInfo']['humidity']),
               if (plantInfo['environmentInfo']['growthTemperature'] != null)
-                _buildInfoRow('생육 온도', plantInfo['environmentInfo']['growthTemperature']),
+                _buildInfoRow(
+                    '생육 온도', plantInfo['environmentInfo']['growthTemperature']),
               if (plantInfo['environmentInfo']['winterTemperature'] != null)
-                _buildInfoRow('겨울 최저온도', plantInfo['environmentInfo']['winterTemperature']),
+                _buildInfoRow('겨울 최저온도',
+                    plantInfo['environmentInfo']['winterTemperature']),
             ]),
 
           // 물 주기 정보
-          if (plantInfo['waterCycle'] != null && (plantInfo['waterCycle'] as Map).isNotEmpty)
+          if (plantInfo['waterCycle'] != null &&
+              (plantInfo['waterCycle'] as Map).isNotEmpty)
             _buildInfoSection('물 주기', [
               if (plantInfo['waterCycle']['spring'] != null)
                 _buildInfoRow('봄', plantInfo['waterCycle']['spring']),
@@ -559,30 +793,47 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
     );
   }
 
-  Widget _buildHealthRow(
-      IconData icon, String label, String value, Color color) {
+  Widget _buildHealthRow(IconData icon, String label, String value, Color color,
+      {String? additionalInfo}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
+          if (additionalInfo != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 36),
+              child: Text(
+                additionalInfo,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -594,15 +845,15 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
       children: [
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.green,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         ...children,
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -983,7 +1234,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('제목과 내용을 모두 입력해주세요'),
+                      content: Text('제목과 내용��� 모두 입력해주세요'),
                       backgroundColor: Colors.red,
                     ),
                   );

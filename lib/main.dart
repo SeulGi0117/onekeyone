@@ -2,7 +2,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 void main() async {
   try {
@@ -22,7 +21,7 @@ void main() async {
     await Firebase.initializeApp(options: firebaseOptions);
     print("Firebase 초기화 성공");
 
-    runApp(MyApp());
+    runApp(const MyApp());
   } catch (e, stackTrace) {
     print("초기화 중 에러 발생: $e");
     print("Stack trace: $stackTrace");
@@ -34,7 +33,7 @@ void main() async {
 class ErrorApp extends StatelessWidget {
   final String error;
 
-  const ErrorApp({Key? key, required this.error}) : super(key: key);
+  const ErrorApp({super.key, required this.error});
 
   @override
   Widget build(BuildContext context) {
@@ -46,12 +45,12 @@ class ErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
+                const Text(
                   '앱 초기화 중 오류가 발생했습니다',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                SizedBox(height: 16),
-                Text(error, style: TextStyle(color: Colors.red)),
+                const SizedBox(height: 16),
+                Text(error, style: const TextStyle(color: Colors.red)),
               ],
             ),
           ),
@@ -62,6 +61,8 @@ class ErrorApp extends StatelessWidget {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -69,13 +70,13 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
         scaffoldBackgroundColor: Colors.white,
-        appBarTheme: AppBarTheme(
+        appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,
         ),
       ),
-      home: HomeScreen(),
+      home: const HomeScreen(),
     );
   }
 }
