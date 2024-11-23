@@ -466,6 +466,10 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 _buildInfoRow('성장 높이', plantInfo['growthInfo']['height']),
               if (plantInfo['growthInfo']['width'] != null) 
                 _buildInfoRow('성장 너비', plantInfo['growthInfo']['width']),
+              if (plantInfo['leafPattern'] != null)
+                _buildInfoRow('잎무늬', plantInfo['leafPattern']),
+              if (plantInfo['smell'] != null)
+                _buildInfoRow('냄새', plantInfo['smell']),
             ]),
 
           // 관리 정보
@@ -475,8 +479,19 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 _buildInfoRow('관리 난이도', plantInfo['managementInfo']['level']),
               if (plantInfo['managementInfo']['demand'] != null)
                 _buildInfoRow('관리요구도', plantInfo['managementInfo']['demand']),
+              if (plantInfo['placementLocation'] != null)
+                _buildInfoRow('배치 장소', plantInfo['placementLocation']),
               if (plantInfo['managementInfo']['special'] != null)
                 _buildInfoRow('특별관리', plantInfo['managementInfo']['special']),
+            ]),
+
+          // 병충해 정보 섹션 추가 (기존 병충해 관리 정보와 함께 표시)
+          if (plantInfo['pestInfo'] != null || plantInfo['pestControlInfo'] != null)
+            _buildInfoSection('병충해 정보', [
+              if (plantInfo['pestInfo'] != null)
+                _buildInfoRow('발생 병충해', plantInfo['pestInfo']),
+              if (plantInfo['pestControlInfo'] != null)
+                _buildInfoRow('관리 방법', plantInfo['pestControlInfo']),
             ]),
 
           // 환경 정보
@@ -509,12 +524,6 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           if (plantInfo['functionInfo'] != null)
             _buildInfoSection('기능성 정보', [
               Text(plantInfo['functionInfo']),
-            ]),
-
-          // 병충해 관리 정보
-          if (plantInfo['pestControlInfo'] != null)
-            _buildInfoSection('병충해 관리', [
-              Text(plantInfo['pestControlInfo']),
             ]),
 
           // 독성 정보
@@ -926,7 +935,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                       .child('reports');
 
                   if (existingReport != null && reportId != null) {
-                    // 기존 보��서 수정
+                    // 기존 보고서 수정
                     await reportsRef.child(reportId).update({
                       'title': title,
                       'content': reportContent,

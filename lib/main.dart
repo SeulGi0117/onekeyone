@@ -7,23 +7,21 @@ import 'package:firebase_storage/firebase_storage.dart';
 void main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
-    
+
     await dotenv.load(fileName: ".env");
     print("환경변수 로드 성공");
-    print("Storage Bucket: ${dotenv.env['FIREBASE_STORAGE_BUCKET']}"); // 디버깅용
-    
+
     final firebaseOptions = FirebaseOptions(
       apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
       appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
       messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
       projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
       databaseURL: dotenv.env['FIREBASE_DATABASE_URL'] ?? '',
-      storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '',
     );
-    
+
     await Firebase.initializeApp(options: firebaseOptions);
     print("Firebase 초기화 성공");
-    
+
     runApp(MyApp());
   } catch (e, stackTrace) {
     print("초기화 중 에러 발생: $e");
@@ -35,9 +33,9 @@ void main() async {
 // 에러 표시용 위젯
 class ErrorApp extends StatelessWidget {
   final String error;
-  
+
   const ErrorApp({Key? key, required this.error}) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

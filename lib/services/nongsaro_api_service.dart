@@ -98,6 +98,8 @@ class NongsaroApiService {
             _addIfNotEmpty(details, 'classification', _getElementText(detailItem, 'clCodeNm')); // 분류
             _addIfNotEmpty(details, 'growthType', _getElementText(detailItem, 'grwhstleCodeNm')); // 생육형태
             _addIfNotEmpty(details, 'ecologyType', _getElementText(detailItem, 'eclgyCodeNm')); // 생태 정보
+            _addIfNotEmpty(details, 'smell', _getElementText(detailItem, 'smellCodeNm')); // 냄새
+            _addIfNotEmpty(details, 'leafPattern', _getElementText(detailItem, 'lefmrkCodeNm')); // 잎무늬
 
             // 생육 정보
             Map<String, dynamic> growthInfo = {};
@@ -145,6 +147,12 @@ class NongsaroApiService {
             // 독성 정보
             _addIfNotEmpty(details, 'toxicity', _getElementText(detailItem, 'toxctyInfo'));
 
+            // 배치 장소 정보 추가
+            _addIfNotEmpty(details, 'placementLocation', _getElementText(detailItem, 'postngplaceCodeNm')); // 배치장소
+
+            // 병충해 정보 추가
+            _addIfNotEmpty(details, 'pestInfo', _getElementText(detailItem, 'dlthtsCodeNm')); // 병충해 정보
+
             // 이미지 URL 추가
             if (imageUrls.isNotEmpty) {
               details['images'] = imageUrls;
@@ -178,7 +186,12 @@ class NongsaroApiService {
 
   void _addIfNotEmpty(Map<String, dynamic> map, String key, String value) {
     if (value.isNotEmpty) {
-      map[key] = value;
+      // 독성 정보 번역
+      if (key == 'toxicity' && value == 'All parts of plant are poisonous if ingested') {
+        map[key] = '식물의 모든 부분은 섭취하면 독성이 있습니다.';
+      } else {
+        map[key] = value;
+      }
     }
   }
 }
