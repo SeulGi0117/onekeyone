@@ -2,31 +2,33 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 void main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
     
-    // .env 파일 로드
     await dotenv.load(fileName: ".env");
-    print("환경변수 로드 성공"); // 디버깅용
+    print("환경변수 로드 성공");
+    print("Storage Bucket: ${dotenv.env['FIREBASE_STORAGE_BUCKET']}"); // 디버깅용
     
-    // Firebase 초기화
-    await Firebase.initializeApp(
-      options: FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
-        appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
-        messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
-        projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
-        databaseURL: dotenv.env['FIREBASE_DATABASE_URL'] ?? '',
-      ),
+    final firebaseOptions = FirebaseOptions(
+      apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
+      appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
+      messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
+      projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
+      databaseURL: dotenv.env['FIREBASE_DATABASE_URL'] ?? '',
+      storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '',
     );
-    print("Firebase 초기화 성공"); // 디버깅용
+    
+    await Firebase.initializeApp(options: firebaseOptions);
+    print("Firebase 초기화 성공");
     
     runApp(MyApp());
-  } catch (e) {
-    print("초기화 중 에러 발생: $e"); // 디버깅용
-    runApp(ErrorApp(error: e.toString())); // 에러 화면 표시
+  } catch (e, stackTrace) {
+    print("초기화 중 에러 발생: $e");
+    print("Stack trace: $stackTrace");
+    runApp(ErrorApp(error: e.toString()));
   }
 }
 

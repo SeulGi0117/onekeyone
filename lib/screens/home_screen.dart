@@ -8,6 +8,7 @@ import '../services/database_service.dart';
 import 'plant_status_screen.dart';
 import 'quest_screen.dart';
 import 'store_screen.dart';
+import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -213,32 +214,69 @@ class _HomeScreenState extends State<HomeScreen> {
                   margin:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: InkWell(
-                    onTap: () {
-                      Map<String, dynamic> plantData =
-                          Map<String, dynamic>.from(plant);
-                      plantData['sensorNode'] = jsonNode;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PlantStatusScreen(
-                            plant: plantData,
-                            sensorData: sensorData,
-                          ),
-                        ),
-                      );
+                    onTap: () async {
+                      try {
+                        final plantInfo = await _apiService.getPlantDetails(
+                          plant['name'],
+                          scientificName: plant['scientificName'],
+                        );
+
+                        if (!mounted) return;
+
+                        if (plantInfo != null) {
+                          Map<String, dynamic> plantData = Map<String, dynamic>.from(plant);
+                          plantData['sensorNode'] = jsonNode;
+                          plantData['plantInfo'] = plantInfo;
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlantStatusScreen(
+                                plant: plantData,
+                                sensorData: sensorData,
+                              ),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('식물 정보를 찾을 수 없습니다')),
+                          );
+                        }
+                      } catch (e) {
+                        print('식물 정보 로딩 오류: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('식물 정보를 불러오는 중 오류가 발생했습니다')),
+                        );
+                      }
                     },
                     child: ListTile(
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(plant['imagePath']),
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                        ),
+                        child: plant['imageBase64'] != null 
+                          ? Image.memory(
+                              base64Decode(plant['imageBase64']),
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              cacheWidth: 100,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: Colors.grey[300],
+                                  child: Icon(Icons.error),
+                                );
+                              },
+                            )
+                          : Container(
+                              width: 50,
+                              height: 50,
+                              color: Colors.grey[300],
+                              child: Icon(Icons.image_not_supported),
+                            ),
                       ),
                       title: Text(
-                        plant['name'],
+                        plant['nickname'] ?? plant['name'],
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -249,21 +287,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (plant['nickname'] != null)
+                              Text(
+                                plant['name'],
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
                             Text('센서 노드: $jsonNode'),
                             Row(
                               children: [
-                                const Icon(Icons.water_drop,
-                                    size: 16, color: Colors.blue),
+                                const Icon(Icons.water_drop, size: 16, color: Colors.blue),
                                 const SizedBox(width: 4),
-                                Text(
-                                    '마지막 물주기: ${_formatDate(plant['lastWatered'])}'),
+                                Text('마지막 물주기: ${_formatDate(plant['lastWatered'])}'),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.favorite,
-                                    size: 16, color: Colors.green),
+                                const Icon(Icons.favorite, size: 16, color: Colors.green),
                                 const SizedBox(width: 4),
                                 Text('상태: ${plant['status']}'),
                               ],
@@ -271,8 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.thermostat,
-                                    size: 16, color: Colors.orange),
+                                const Icon(Icons.thermostat, size: 16, color: Colors.orange),
                                 const SizedBox(width: 4),
                                 Text('온도: ${sensorData['온도'] ?? '측정중'}'),
                               ],
@@ -280,8 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.opacity,
-                                    size: 16, color: Colors.lightBlue),
+                                const Icon(Icons.opacity, size: 16, color: Colors.lightBlue),
                                 const SizedBox(width: 4),
                                 Text('습도: ${sensorData['습도'] ?? '측정중'}'),
                               ],
@@ -289,8 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.wb_sunny,
-                                    size: 16, color: Colors.yellow),
+                                const Icon(Icons.wb_sunny, size: 16, color: Colors.yellow),
                                 const SizedBox(width: 4),
                                 Text('조도: ${sensorData['조도'] ?? '측정중'}'),
                               ],
@@ -298,8 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.water,
-                                    size: 16, color: Colors.blue),
+                                const Icon(Icons.water, size: 16, color: Colors.blue),
                                 const SizedBox(width: 4),
                                 Text('토양습도: ${sensorData['토양습도'] ?? '측정중'}'),
                               ],

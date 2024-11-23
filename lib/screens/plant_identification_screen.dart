@@ -146,6 +146,17 @@ class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
  
   Future<void> _registerPlant(Map<String, dynamic> plantData) async {
     try {
+      // 로딩 표시
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
       // 식물 정보를 Firebase에 저장
       await _databaseService.addPlant({
         'name': plantData['name'],
@@ -160,17 +171,28 @@ class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
 
       if (!mounted) return;
       
+      // 로딩 다이얼로그 닫기
+      Navigator.pop(context);
+      
+      // 성공 메시지 표시
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('식물이 성공적으로 등록되었습니다!')),
       );
 
-      Navigator.pop(context, plantData);
+      // 홈 화면으로 이동
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
+      // 로딩 다이얼로그 닫기
+      Navigator.pop(context);
+      
       print('식물 등록 오류: $e');
       if (!mounted) return;
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('식물 등록 중 오류가 발생했습니다.')),
+        SnackBar(
+          content: Text('식물 등록 중 오류가 발생했습니다.'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }

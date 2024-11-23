@@ -236,7 +236,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           controller: _tabController,
           children: [
             _buildRealTimeDataTab(context),
-            _buildPlantInfoTab(context),
+            _buildPlantInfoTab(),
           ],
         ),
       ),
@@ -412,101 +412,79 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
     );
   }
 
-  Widget _buildPlantInfoTab(BuildContext context) {
-    final NongsaroApiService apiService = NongsaroApiService();
+  Widget _buildPlantInfoTab() {
+    final plantInfo = widget.plant['plantInfo'] as Map<String, dynamic>?;
+    
+    if (plantInfo == null) {
+      return Center(child: Text('식물 정보를 찾을 수 없습니다'));
+    }
 
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: apiService.getPlantDetails(
-        widget.plant['name'],
-        scientificName: widget.plant['scientificName'],
-        englishName: widget.plant['englishName'],
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (plantInfo['images'] != null && (plantInfo['images'] as List).isNotEmpty)
+            Container(
+              height: 200,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: (plantInfo['images'] as List).length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        plantInfo['images'][index],
+                        width: 200,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          SizedBox(height: 16),
+          _buildInfoSection('기본 정보', [
+            _buildInfoRow('한글명', plantInfo['koreanName'] ?? '-'),
+            _buildInfoRow('영문명', plantInfo['englishName'] ?? '-'),
+            _buildInfoRow('학명', plantInfo['scientificName'] ?? '-'),
+            _buildInfoRow('과명', plantInfo['familyName'] ?? '-'),
+            _buildInfoRow('원산지', plantInfo['origin'] ?? '-'),
+          ]),
+          _buildInfoSection('생육 정보', [
+            _buildInfoRow('성장 높이', plantInfo['growthHeight'] ?? '-'),
+            _buildInfoRow('성장 너비', plantInfo['growthWidth'] ?? '-'),
+            _buildInfoRow('생장 속도', plantInfo['growthSpeed'] ?? '-'),
+            _buildInfoRow('잎 특성', plantInfo['leafInfo'] ?? '-'),
+            _buildInfoRow('꽃 특성', plantInfo['flowerInfo'] ?? '-'),
+          ]),
+          _buildInfoSection('관리 방법', [
+            _buildInfoRow('관리 난이도', plantInfo['managementLevel'] ?? '-'),
+            _buildInfoRow('빛 요구도', plantInfo['lightDemand'] ?? '-'),
+            _buildInfoRow('생육 온도', plantInfo['temperature']['growth'] ?? '-'),
+            _buildInfoRow('겨울 최저온도', plantInfo['temperature']['winter'] ?? '-'),
+            _buildInfoRow('습도', plantInfo['humidity'] ?? '-'),
+            _buildInfoRow('비료', plantInfo['fertilizer'] ?? '-'),
+            _buildInfoRow('토양', plantInfo['soil'] ?? '-'),
+          ]),
+          _buildInfoSection('물 주기', [
+            _buildInfoRow('봄', plantInfo['waterCycle']['spring'] ?? '-'),
+            _buildInfoRow('여름', plantInfo['waterCycle']['summer'] ?? '-'),
+            _buildInfoRow('가을', plantInfo['waterCycle']['autumn'] ?? '-'),
+            _buildInfoRow('겨울', plantInfo['waterCycle']['winter'] ?? '-'),
+          ]),
+          if (plantInfo['specialManagement']?.isNotEmpty ?? false)
+            _buildInfoSection('특별 관리', [
+              Text(plantInfo['specialManagement']),
+            ]),
+          if (plantInfo['toxicity']?.isNotEmpty ?? false)
+            _buildInfoSection('독성 정보', [
+              Text(plantInfo['toxicity']),
+            ]),
+        ],
       ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return const Center(child: Text('식물 정보를 불러오는데 실패했습니다.'));
-        }
-
-        final plantDetails = snapshot.data ??
-            {
-              'koreanName': '-',
-              'scientificName': '-',
-              'englishName': '-',
-              'familyName': '-',
-              'origin': '-',
-              'growthHeight': '-',
-              'growthWidth': '-',
-              'leafInfo': '-',
-              'flowerInfo': '-',
-              'managementLevel': '-',
-              'lightDemand': '-',
-              'waterCycle': {
-                'spring': '-',
-                'summer': '-',
-                'autumn': '-',
-                'winter': '-',
-              },
-              'temperature': {
-                'growth': '-',
-                'winter': '-',
-              },
-              'humidity': '-',
-              'specialManagement': '-',
-              'toxicity': '-',
-            };
-
-        if (snapshot.data == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('식물 정보를 찾을 수 없습니다.'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          });
-        }
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '기본 정보',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              _buildInfoSection('식물명', [
-                _buildInfoRow('한글명', plantDetails['koreanName']),
-                _buildInfoRow('영문명', plantDetails['englishName']),
-                _buildInfoRow('학명', plantDetails['scientificName']),
-                _buildInfoRow('과명', plantDetails['familyName']),
-              ]),
-              _buildInfoSection('식물 특성', [
-                _buildInfoRow('원산지', plantDetails['origin']),
-                _buildInfoRow('성장 높이', plantDetails['growthHeight']),
-                _buildInfoRow('성장 너비', plantDetails['growthWidth']),
-                _buildInfoRow('잎 정보', plantDetails['leafInfo']),
-                _buildInfoRow('꽃 정보', plantDetails['flowerInfo']),
-              ]),
-              _buildInfoSection('관리 정보', [
-                _buildInfoRow('관리 수준', plantDetails['managementLevel']),
-                _buildInfoRow('광 요구도', plantDetails['lightDemand']),
-                _buildInfoRow('물 주기',
-                    '봄: ${plantDetails['waterCycle']['spring']}, 여름: ${plantDetails['waterCycle']['summer']}, 가을: ${plantDetails['waterCycle']['autumn']}, 겨울: ${plantDetails['waterCycle']['winter']}'),
-                _buildInfoRow('성장 온도', plantDetails['temperature']['growth']),
-                _buildInfoRow('겨울 온도', plantDetails['temperature']['winter']),
-                _buildInfoRow('습도', plantDetails['humidity']),
-                _buildInfoRow('특별 관리', plantDetails['specialManagement']),
-                _buildInfoRow('독성 정보', plantDetails['toxicity']),
-              ]),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -568,15 +546,15 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.green,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         ...children,
-        const SizedBox(height: 24),
+        SizedBox(height: 24),
       ],
     );
   }
@@ -714,7 +692,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
               return const Card(
                 child: Padding(
                   padding: EdgeInsets.all(16.0),
-                  child: Text('아직 작성된 성장 보고서가 없습니다'),
+                  child: Text('아�� 작성된 성장 보고서가 없습니다'),
                 ),
               );
             }
