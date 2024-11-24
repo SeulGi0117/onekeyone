@@ -22,8 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final NongsaroApiService _apiService = NongsaroApiService();
   int _selectedIndex = 0;
 
-  late final Stream<DatabaseEvent> _plantsStream;
-  late final Stream<DatabaseEvent> _sensorStream;
+  late final Stream<DatabaseEvent> _plantsStream, _sensorStream;
 
   @override
   void initState() {
@@ -224,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (!mounted) return;
 
                         if (plantInfo != null) {
-                          Map<String, dynamic> plantData = Map<String, dynamic>.from(plant);
+                          Map<String, dynamic> plantData =
+                              Map<String, dynamic>.from(plant);
                           plantData['sensorNode'] = jsonNode;
                           plantData['plantInfo'] = plantInfo;
 
@@ -252,28 +252,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ListTile(
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: plant['imageBase64'] != null 
-                          ? Image.memory(
-                              base64Decode(plant['imageBase64']),
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              cacheWidth: 100,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  width: 50,
-                                  height: 50,
-                                  color: Colors.grey[300],
-                                  child: Icon(Icons.error),
-                                );
-                              },
-                            )
-                          : Container(
-                              width: 50,
-                              height: 50,
-                              color: Colors.grey[300],
-                              child: Icon(Icons.image_not_supported),
-                            ),
+                        child: plant['imageBase64'] != null
+                            ? Image.memory(
+                                base64Decode(plant['imageBase64']),
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                                cacheWidth: 100,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 50,
+                                    height: 50,
+                                    color: Colors.grey[300],
+                                    child: Icon(Icons.error),
+                                  );
+                                },
+                              )
+                            : Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.grey[300],
+                                child: Icon(Icons.image_not_supported),
+                              ),
                       ),
                       title: Text(
                         plant['nickname'] ?? plant['name'],
@@ -298,15 +298,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             Text('센서 노드: $jsonNode'),
                             Row(
                               children: [
-                                const Icon(Icons.water_drop, size: 16, color: Colors.blue),
+                                const Icon(Icons.water_drop,
+                                    size: 16, color: Colors.blue),
                                 const SizedBox(width: 4),
-                                Text('마지막 물주기: ${_formatDate(plant['lastWatered'])}'),
+                                Text(
+                                    '마지막 물주기: ${_formatDate(plant['lastWatered'])}'),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.favorite, size: 16, color: Colors.green),
+                                const Icon(Icons.favorite,
+                                    size: 16, color: Colors.green),
                                 const SizedBox(width: 4),
                                 Text('상태: ${plant['status']}'),
                               ],
@@ -314,7 +317,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.thermostat, size: 16, color: Colors.orange),
+                                const Icon(Icons.thermostat,
+                                    size: 16, color: Colors.orange),
                                 const SizedBox(width: 4),
                                 Text('온도: ${sensorData['온도'] ?? '측정중'}'),
                               ],
@@ -322,7 +326,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.opacity, size: 16, color: Colors.lightBlue),
+                                const Icon(Icons.opacity,
+                                    size: 16, color: Colors.lightBlue),
                                 const SizedBox(width: 4),
                                 Text('습도: ${sensorData['습도'] ?? '측정중'}'),
                               ],
@@ -330,7 +335,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.wb_sunny, size: 16, color: Colors.yellow),
+                                const Icon(Icons.wb_sunny,
+                                    size: 16, color: Colors.yellow),
                                 const SizedBox(width: 4),
                                 Text('조도: ${sensorData['조도'] ?? '측정중'}'),
                               ],
@@ -338,7 +344,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.water, size: 16, color: Colors.blue),
+                                const Icon(Icons.water,
+                                    size: 16, color: Colors.blue),
                                 const SizedBox(width: 4),
                                 Text('토양습도: ${sensorData['토양습도'] ?? '측정중'}'),
                               ],

@@ -86,26 +86,49 @@ class _PlantIdentificationScreenState extends State<PlantIdentificationScreen> {
             result['result']['classification'] != null &&
             result['result']['classification']['suggestions'] != null) {
           setState(() {
-            analysisResults = List<Map<String, dynamic>>.from(result['result']
-                    ['classification']['suggestions']
-                .map((suggestion) => {
-                      'name': suggestion['name'],
-                      'probability': suggestion['probability'],
-                    }));
-
+            analysisResults = List<Map<String, dynamic>>.from(
+              result['result']['classification']['suggestions'].map((suggestion) => {
+                'name': suggestion['name'] ?? '',
+                'probability': suggestion['probability'] ?? 0.0,
+                'plantInfo': suggestion['plantInfo'] ?? {},
+              }),
+            );
             isAnalyzing = false;
           });
+
+          // 농사로 API에서 추가 정보 가져오기
+          if (analysisResults != null && analysisResults!.isNotEmpty) {
+            try {
+              final plantInfo = await _apiService.getPlantDetails(
+                analysisResults![0]['name'],
+                scientificName: analysisResults![0]['name'],
+              );
+              
+              if (plantInfo != null) {
+                setState(() {
+                  analysisResults![0]['plantInfo'] = plantInfo;
+                });
+              }
+            } catch (e) {
+              print('농사로 API 정보 조회 실패: $e');
+            }
+          }
         }
       }
     } catch (e) {
       print('에러 발생: $e');
 
       if (!mounted) return;
-
       Navigator.of(context).pop(); // 에러 발생 시 팝업 닫기
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('식물 인식 중 오류가 발생했습니다.')),
+        SnackBar(
+          content: Text(e.toString().contains('Exception:') 
+              ? e.toString().replaceAll('Exception: ', '') 
+              : '식물 인식 중 오류가 발생했습니다.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
       );
     }
   }

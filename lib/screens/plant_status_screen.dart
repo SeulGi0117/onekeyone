@@ -277,10 +277,37 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 aspectRatio: 1,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(widget.plant['imagePath']),
-                    fit: BoxFit.cover,
-                  ),
+                  child: widget.plant['imageBase64'] != null
+                      ? Image.memory(
+                          base64Decode(widget.plant['imageBase64']),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('이미지 로드 에러: $error');
+                            return Container(
+                              color: Colors.grey[300],
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.error,
+                                      size: 50, color: Colors.red),
+                                  SizedBox(height: 8),
+                                  Text('이미지를 불러올 수 없습니다'),
+                                ],
+                              ),
+                            );
+                          },
+                        )
+                      : Container(
+                          color: Colors.grey[300],
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.image_not_supported, size: 50),
+                              SizedBox(height: 8),
+                              Text('이미지 없음'),
+                            ],
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -921,24 +948,30 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
 
   // _buildRealTimeDataTab 메서드 내부의 센서 카드 다음에 추가
   Widget _buildCameraCard() {
-    if (_isDisposed) return Container();
-
-    return StreamBuilder<DatabaseEvent>(
-      key: const ValueKey('camera_stream'),
+    String sensorNode = widget.plant['sensorNode'] ?? 'JSON';
+    return StreamBuilder(
       stream: FirebaseDatabase.instance
           .ref()
-          .child('JSON/ESP32CAM')
-          .onValue
-          .asBroadcastStream(),
-      builder: (context, snapshot) {
-        if (_isDisposed) return Container();
+          .child(sensorNode)
+          .child('ESP32CAM')
+          .onValue,
+      builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
+        if (snapshot.hasError) {
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.error, color: Colors.red),
+              title: const Text('실시간 식물 사진 보기'),
+              subtitle: Text('오류 발생: ${snapshot.error}'),
+            ),
+          );
+        }
 
         if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
-          return const Card(
+          return Card(
             child: ListTile(
-              leading: Icon(Icons.camera_alt, color: Colors.grey),
-              title: Text('실시간 식물 사진 보기'),
-              subtitle: Text('카라 연결 대기중...'),
+              leading: const Icon(Icons.camera_alt, color: Colors.grey),
+              title: const Text('실시간 식물 사진 보기'),
+              subtitle: const Text('카메라 연결 대기중...'),
             ),
           );
         }
@@ -953,7 +986,62 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 Text('최근 업데이트: ${DateTime.now().toString().substring(11, 16)}'),
             onTap: () {
               if (imageData.startsWith('data:image')) {
-                _showCameraImageDialog(context, imageData);
+                showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '실시간 카메라 - ${widget.plant['name']}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Image.memory(
+                            base64Decode(imageData.split(',')[1]),
+                            errorBuilder: (context, error, stackTrace) {
+                              print('실시간 이미지 로드 에러: $error');
+                              return Container(
+                                width: double.infinity,
+                                height: 300,
+                                color: Colors.grey[300],
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.error,
+                                        size: 50, color: Colors.red),
+                                    SizedBox(height: 8),
+                                    Text('이미지를 불러올 수 없습니다'),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text('센서 노드: $sensorNode'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('유효하지 않은 이미지 데이터입니다.')),
@@ -1234,7 +1322,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('제목과 내용��� 모두 입력해주세요'),
+                      content: Text('제목과 내용 모두 입력해주세요'),
                       backgroundColor: Colors.red,
                     ),
                   );
