@@ -522,25 +522,55 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                           final plantData = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
                           final status = plantData['status'];
 
-                          Color statusColor;
-                          String statusText;
-                          
-                          if (status == 'healthy') {
-                            statusColor = Colors.green;
-                            statusText = '건강함';
-                          } else if (status == null || status == 'Unknown') {
-                            statusColor = Colors.grey;
-                            statusText = '분석 대기중';
-                          } else {
-                            statusColor = Colors.red;
-                            statusText = status; // AI가 예측한 질병명 표시
+                          // 상태가 없거나 Unknown인 경우
+                          if (status == null || status == 'Unknown') {
+                            return _buildHealthRow(
+                              Icons.favorite,
+                              '건강 상태',
+                              '분석 대기중',
+                              Colors.grey,
+                            );
                           }
 
-                          return _buildHealthRow(
-                            Icons.favorite,
-                            '건강 상태',
-                            statusText,
-                            statusColor,
+                          // 건강한 상태인 경우
+                          if (status == 'healthy') {
+                            return _buildHealthRow(
+                              Icons.favorite,
+                              '건강 상태',
+                              '건강함',
+                              Colors.green,
+                            );
+                          }
+
+                          // 질병이 있는 경우, Firebase에서 한국어 병명 가져오기
+                          return FutureBuilder<DataSnapshot>(
+                            future: FirebaseDatabase.instance
+                                .ref()
+                                .child('plant_diseases')
+                                .child(status.replaceAll(' ', '_'))  // status 값 사용
+                                .get(),
+                            builder: (context, diseaseSnapshot) {
+                              if (!diseaseSnapshot.hasData || diseaseSnapshot.data?.value == null) {
+                                return _buildHealthRow(
+                                  Icons.favorite,
+                                  '건강 상태',
+                                  status,
+                                  Colors.red,
+                                );
+                              }
+
+                              final diseaseData = Map<String, dynamic>.from(diseaseSnapshot.data!.value as Map);
+                              final koreanName = diseaseData['한국어_병명'] ?? status;
+
+                              return _buildHealthRow(
+                                Icons.favorite,
+                                '건강 상태',
+                                koreanName,  // 한글 이름 표시
+                                Colors.red,
+                                additionalInfo: '자세한 정보를 보려면 클릭하세요',
+                                originalStatus: status,  // 원래 status 값을 전달
+                              );
+                            },
                           );
                         },
                       ),
@@ -949,46 +979,204 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
   }
 
   Widget _buildHealthRow(IconData icon, String label, String value, Color color,
-      {String? additionalInfo}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      {String? additionalInfo, String? originalStatus}) {
+    return InkWell(
+      onTap: () async {
+        if (value != '건강함' && value != '분석 대기중') {
+          try {
+            // Firebase에서 질병 정보를 가져옵 때 originalStatus 사용
+            final diseaseRef = FirebaseDatabase.instance
+                .ref()
+                .child('plant_diseases')
+                .child((originalStatus ?? value).replaceAll(' ', '_')); // originalStatus가 있으면 사용
+            
+            final snapshot = await diseaseRef.get();
+            if (snapshot.exists) {
+              final diseaseData = Map<String, dynamic>.from(snapshot.value as Map);
+              
+              if (!mounted) return;
+              showDialog(
+                context: context,
+                builder: (context) => Dialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 헤더 부분
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                            topRight: Radius.circular(20),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.local_hospital, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                diseaseData['한국어_병명'] ?? value,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, color: Colors.white),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // 내용 부분
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildDiseaseDetailSection(
+                                '증상',
+                                diseaseData['증상'] ?? '정보 없음',
+                                Icons.sick,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildDiseaseDetailSection(
+                                '원인',
+                                diseaseData['원인'] ?? '정보 없음',
+                                Icons.help_outline,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildDiseaseDetailSection(
+                                '처방전',
+                                diseaseData['처방전'] ?? '정보 없음',
+                                Icons.healing,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // 하단 버튼
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              '확인',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          } catch (e) {
+            print('질병 정보 로드 오류: $e');
+          }
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+            if (additionalInfo != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 36),
+                child: Text(
+                  additionalInfo,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: color,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiseaseDetailSection(String title, String content, IconData icon) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(width: 12),
+              Icon(icon, color: Colors.green, size: 24),
+              const SizedBox(width: 8),
               Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 16,
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: Colors.green,
                 ),
               ),
             ],
           ),
-          if (additionalInfo != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 36),
-              child: Text(
-                additionalInfo,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
+          const SizedBox(height: 12),
+          Text(
+            content,
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.5,
             ),
+          ),
         ],
       ),
     );

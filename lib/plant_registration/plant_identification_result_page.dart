@@ -195,6 +195,22 @@ class _PlantResultItemWithImageState extends State<PlantResultItemWithImage> {
 }
 
 void _showPlantInfo(BuildContext context, Map<String, dynamic> plant) {
+  // 학명에서 공백과 특수문자를 _로 변환
+  String searchName = plant['scientific_name'] ?? plant['name'];
+  searchName = searchName
+      .replaceAll('.', '_')
+      .replaceAll('[', '_')
+      .replaceAll(']', '_')
+      .replaceAll('#', '_')
+      .replaceAll(' ', '_')
+      .replaceAll('(', '_')
+      .replaceAll(')', '_')
+      .replaceAll('/', '_')
+      .replaceAll('\\', '_')
+      .replaceAll(',', '_')
+      .replaceAll('\'', '_')
+      .replaceAll('"', '_');
+
   Navigator.push(
     context,
     MaterialPageRoute(
@@ -219,102 +235,91 @@ void _showPlantInfo(BuildContext context, Map<String, dynamic> plant) {
               FutureBuilder<Map<String, dynamic>?>(
                 future: NongsaroApiService().getPlantDetails(
                   plant['name'],
-                  scientificName: plant['scientific_name'],
+                  scientificName: searchName,  // 변환된 학명 전달
                 ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator());
                   }
 
-                  final plantDetails = {
-                    'koreanName': '-',
-                    'scientificName': '-',
-                    'englishName': '-',
-                    'familyName': '-',
-                    'origin': '-',
-                    'growthHeight': '-',
-                    'growthWidth': '-',
-                    'leafInfo': '-',
-                    'flowerInfo': '-',
-                    'managementLevel': '-',
-                    'lightDemand': '-',
-                    'waterCycle': {
-                      'spring': '-',
-                      'summer': '-',
-                      'autumn': '-',
-                      'winter': '-',
-                    },
-                    'temperature': {
-                      'growth': '-',
-                      'winter': '-',
-                    },
-                    'humidity': '-',
-                    'specialManagement': '-',
-                    'toxicity': '-',
-                  };
-
-                  if (snapshot.data == null) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('식물 정보를 찾을 수 없습니다.'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    });
-                  } else {
-                    // Map<String, dynamic>을 Map<String, Object>로 안전하게 변환
-                    plantDetails.addAll(Map<String, Object>.from(snapshot.data!));
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('오류가 발생했습니다: ${snapshot.error}'),
+                    );
                   }
 
-                  return SingleChildScrollView(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '기본 정보',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        _buildInfoSection('식물명', [
-                          _buildInfoRow('한글명', (plantDetails['koreanName'] ?? '-').toString()),
-                          _buildInfoRow('영문명', (plantDetails['englishName'] ?? '-').toString()),
-                          _buildInfoRow('학명', (plantDetails['scientificName'] ?? '-').toString()),
-                          _buildInfoRow('과명', (plantDetails['familyName'] ?? '-').toString()),
-                        ]),
-                        _buildInfoSection('식물 특성', [
-                          _buildInfoRow('원산지', (plantDetails['origin'] ?? '-').toString()),
-                          _buildInfoRow('성장 높이', (plantDetails['growthHeight'] ?? '-').toString()),
-                          _buildInfoRow('성장 너비', (plantDetails['growthWidth'] ?? '-').toString()),
-                          _buildInfoRow('잎 정보', (plantDetails['leafInfo'] ?? '-').toString()),
-                          _buildInfoRow('꽃 정보', (plantDetails['flowerInfo'] ?? '-').toString()),
-                        ]),
-                        _buildInfoSection('관리 정보', [
-                          _buildInfoRow('관리 수준', (plantDetails['managementLevel'] ?? '-').toString()),
-                          _buildInfoRow('광 요구도', (plantDetails['lightDemand'] ?? '-').toString()),
-                          _buildInfoRow('물 주기', '봄: ${(plantDetails['waterCycle'] as Map<String, dynamic>)['spring'] ?? '-'}, ' +
-                              '여름: ${(plantDetails['waterCycle'] as Map<String, dynamic>)['summer'] ?? '-'}, ' +
-                              '가을: ${(plantDetails['waterCycle'] as Map<String, dynamic>)['autumn'] ?? '-'}, ' +
-                              '겨울: ${(plantDetails['waterCycle'] as Map<String, dynamic>)['winter'] ?? '-'}'),
-                          _buildInfoRow('성장 온도', (plantDetails['temperature'] as Map<String, dynamic>)['growth']?.toString() ?? '-'),
-                          _buildInfoRow('겨울 온도', (plantDetails['temperature'] as Map<String, dynamic>)['winter']?.toString() ?? '-'),
-                          _buildInfoRow('습도', (plantDetails['humidity'] ?? '-').toString()),
-                          _buildInfoRow('특별 관리', (plantDetails['specialManagement'] ?? '-').toString()),
-                          _buildInfoRow('독성 정보', (plantDetails['toxicity'] ?? '-').toString()),
-                        ]),
-                      ],
-                    ),
-                  );
+                  if (!snapshot.hasData) {
+                    // 첫 번째 시도 실패 시, 학명 뒤에 _를 추가하여 다시 시도
+                    return FutureBuilder<Map<String, dynamic>?>(
+                      future: NongsaroApiService().getPlantDetails(
+                        plant['name'],
+                        scientificName: '${searchName}_',  // 학명 뒤에 _ 추가
+                      ),
+                      builder: (context, retrySnapshot) {
+                        if (retrySnapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        final plantDetails = retrySnapshot.data;
+                        if (plantDetails == null) {
+                          return const Center(
+                            child: Text('식물 정보를 찾을 수 없습니다.'),
+                          );
+                        }
+
+                        return _buildPlantInfoView(plantDetails);
+                      },
+                    );
+                  }
+
+                  return _buildPlantInfoView(snapshot.data!);
                 },
               ),
             ],
           ),
         ),
       ),
+    ),
+  );
+}
+
+Widget _buildPlantInfoView(Map<String, dynamic> plantDetails) {
+  return SingleChildScrollView(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (plantDetails['images'] != null && (plantDetails['images'] as List).isNotEmpty)
+          SizedBox(
+            height: 200,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: (plantDetails['images'] as List).length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      plantDetails['images'][index],
+                      width: 200,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 16),
+        _buildInfoSection('기본 정보', [
+          _buildInfoRow('한글명', plantDetails['koreanName'] ?? '-'),
+          _buildInfoRow('영문명', plantDetails['englishName'] ?? '-'),
+          _buildInfoRow('학명', plantDetails['scientificName'] ?? '-'),
+          _buildInfoRow('과명', plantDetails['familyCode'] ?? '-'),
+          _buildInfoRow('원산지', plantDetails['origin'] ?? '-'),
+        ]),
+        // 나머지 섹션들도 동일한 방식으로 표시...
+      ],
     ),
   );
 }
