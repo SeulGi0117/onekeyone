@@ -532,8 +532,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                             );
                           }
 
-                          // 건강한 상태인 경우
-                          if (status == 'healthy') {
+                          // 건강한 상태인 경우 (plant___healthy 포함)
+                          if (status == 'healthy' || status == 'plant___healthy') {
                             return _buildHealthRow(
                               Icons.favorite,
                               '건강 상태',
@@ -547,15 +547,39 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                             future: FirebaseDatabase.instance
                                 .ref()
                                 .child('plant_diseases')
-                                .child(status.replaceAll(' ', '_'))  // status 값 사용
+                                .child(status.replaceAll(' ', '_'))  // 공백을 _로 변환
                                 .get(),
                             builder: (context, diseaseSnapshot) {
                               if (!diseaseSnapshot.hasData || diseaseSnapshot.data?.value == null) {
-                                return _buildHealthRow(
-                                  Icons.favorite,
-                                  '건강 상태',
-                                  status,
-                                  Colors.red,
+                                // 첫 번째 시도 실패 시, 끝에 _ 추가해서 다시 시도
+                                return FutureBuilder<DataSnapshot>(
+                                  future: FirebaseDatabase.instance
+                                      .ref()
+                                      .child('plant_diseases')
+                                      .child('${status.replaceAll(' ', '_')}_')  // 끝에 _ 추가
+                                      .get(),
+                                  builder: (context, retrySnapshot) {
+                                    if (!retrySnapshot.hasData || retrySnapshot.data?.value == null) {
+                                      return _buildHealthRow(
+                                        Icons.favorite,
+                                        '건강 상태',
+                                        status,
+                                        Colors.red,
+                                      );
+                                    }
+
+                                    final diseaseData = Map<String, dynamic>.from(retrySnapshot.data!.value as Map);
+                                    final koreanName = diseaseData['한국어_병명'] ?? status;
+
+                                    return _buildHealthRow(
+                                      Icons.favorite,
+                                      '건강 상태',
+                                      koreanName,
+                                      Colors.red,
+                                      additionalInfo: '자세한 정보를 보려면 클릭하세요',
+                                      originalStatus: status,
+                                    );
+                                  },
                                 );
                               }
 
@@ -565,10 +589,10 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                               return _buildHealthRow(
                                 Icons.favorite,
                                 '건강 상태',
-                                koreanName,  // 한글 이름 표시
+                                koreanName,
                                 Colors.red,
                                 additionalInfo: '자세한 정보를 보려면 클릭하세요',
-                                originalStatus: status,  // 원래 status 값을 전달
+                                originalStatus: status,
                               );
                             },
                           );
