@@ -402,19 +402,141 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '식물 건강 상태',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '식물 건강 상태',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh, color: Colors.green),
+                            onPressed: () async {
+                              // AI 분석 시작 알림
+                              String plantName = _nickname ?? widget.plant['name'];
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (BuildContext context) {
+                                  return AlertDialog(
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const CircularProgressIndicator(),
+                                        const SizedBox(height: 16),
+                                        Text('AI가 등록된 식물 "$plantName"의\n건강 상태를 분석 중이에요...'),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+
+                              try {
+                                // Firebase Realtime Database에서 건강 상태 가져오기
+                                final healthRef = FirebaseDatabase.instance
+                                    .ref()
+                                    .child('plants')
+                                    .child(widget.plant['id'])
+                                    .child('health_status');
+                                
+                                final snapshot = await healthRef.get();
+                                if (snapshot.exists) {
+                                  final healthData = Map<String, dynamic>.from(snapshot.value as Map);
+                                  
+                                  // 분석 완료 후 다이얼로그 닫기
+                                  if (mounted) {
+                                    Navigator.of(context).pop();
+                                    
+                                    // 결과 표시
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: const Text('분석 완료'),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('$plantName의 건강 상태:'),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                healthData['status'] == 'healthy' 
+                                                    ? '건강한 상태입니다.' 
+                                                    : '질병이 감지되었습니다: ${healthData['disease']}',
+                                                style: TextStyle(
+                                                  color: healthData['status'] == 'healthy' 
+                                                      ? Colors.green 
+                                                      : Colors.red,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('확인'),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                print('건강 상태 분석 오류: $e');
+                                if (mounted) {
+                                  Navigator.of(context).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('건강 상태 분석 중 오류가 발생했습니다.'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
-                      _buildHealthRow(
-                        Icons.favorite,
-                        '건강 상태',
-                        '건강함',
-                        Colors.green,
+                      StreamBuilder<DatabaseEvent>(
+                        stream: FirebaseDatabase.instance
+                            .ref()
+                            .child('plants')
+                            .child(widget.plant['id'])
+                            .child('health_status')
+                            .onValue,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+                            return _buildHealthRow(
+                              Icons.favorite,
+                              '건강 상태',
+                              '분석 대기중',
+                              Colors.grey,
+                            );
+                          }
+
+                          final healthData = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
+                          final status = healthData['status'];
+                          final disease = healthData['disease'];
+                          final timestamp = healthData['timestamp'];
+
+                          return Column(
+                            children: [
+                              _buildHealthRow(
+                                Icons.favorite,
+                                '건강 상태',
+                                status == 'healthy' ? '건강함' : disease ?? '질병 감지됨',
+                                status == 'healthy' ? Colors.green : Colors.red,
+                                additionalInfo: '마지막 분석: $timestamp',
+                              ),
+                            ],
+                          );
+                        },
                       ),
                       // 온도 상태
                       StreamBuilder<DatabaseEvent>(
