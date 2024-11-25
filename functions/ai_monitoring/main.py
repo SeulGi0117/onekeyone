@@ -133,6 +133,9 @@ class PlantHealthMonitor:
             # Unhealthy 잎 확인
             unhealthy_results = results[results['name'].str.lower() == 'unhealthy']
             
+            # Firebase 레퍼런스 생성
+            plant_ref = self.db.reference(f'plants/{plant_id}')
+            
             if not unhealthy_results.empty:
                 # 첫 번째 unhealthy 잎 크롭
                 first_unhealthy = unhealthy_results.iloc[0]
@@ -146,9 +149,18 @@ class PlantHealthMonitor:
                 disease = self.analyze_disease(crop_path)
                 os.remove(crop_path)  # 임시 파일 삭제
                 
-                self.update_plant_status(plant_id, "unhealthy", disease)
+                # Firebase에 상태 업데이트
+                plant_ref.update({
+                    'status': disease if disease else 'Unknown',
+                    'lastUpdated': datetime.now().isoformat()
+                })
+                
             else:
-                self.update_plant_status(plant_id, "healthy")
+                # 건강한 상태로 업데이트
+                plant_ref.update({
+                    'status': 'healthy',
+                    'lastUpdated': datetime.now().isoformat()
+                })
                 
         except Exception as e:
             print(f"식물 처리 중 오류 발생: {e}")

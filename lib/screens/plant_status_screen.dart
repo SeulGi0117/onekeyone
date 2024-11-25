@@ -508,7 +508,6 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                             .ref()
                             .child('plants')
                             .child(widget.plant['id'])
-                            .child('health_status')
                             .onValue,
                         builder: (context, snapshot) {
                           if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
@@ -520,21 +519,28 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                             );
                           }
 
-                          final healthData = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-                          final status = healthData['status'];
-                          final disease = healthData['disease'];
-                          final timestamp = healthData['timestamp'];
+                          final plantData = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
+                          final status = plantData['status'];
 
-                          return Column(
-                            children: [
-                              _buildHealthRow(
-                                Icons.favorite,
-                                '건강 상태',
-                                status == 'healthy' ? '건강함' : disease ?? '질병 감지됨',
-                                status == 'healthy' ? Colors.green : Colors.red,
-                                additionalInfo: '마지막 분석: $timestamp',
-                              ),
-                            ],
+                          Color statusColor;
+                          String statusText;
+                          
+                          if (status == 'healthy') {
+                            statusColor = Colors.green;
+                            statusText = '건강함';
+                          } else if (status == null || status == 'Unknown') {
+                            statusColor = Colors.grey;
+                            statusText = '분석 대기중';
+                          } else {
+                            statusColor = Colors.red;
+                            statusText = status; // AI가 예측한 질병명 표시
+                          }
+
+                          return _buildHealthRow(
+                            Icons.favorite,
+                            '건강 상태',
+                            statusText,
+                            statusColor,
                           );
                         },
                       ),
@@ -816,7 +822,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           const SizedBox(height: 16),
 
           // 기본 정보
-          _buildInfoSection('기본 정보', [
+          _buildInfoSection('기본 보', [
             if (plantInfo['koreanName'] != null)
               _buildInfoRow('한글명', plantInfo['koreanName']),
             if (plantInfo['englishName'] != null)
@@ -1332,8 +1338,13 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 print('보고서 삭제 오류: $e');
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('삭제'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text(
+              '삭제',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -1341,8 +1352,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
   }
 
   // _showGrowthReportDialog 메서드 수정
-  void _showGrowthReportDialog(
-      {Map<String, dynamic>? existingReport, String? reportId}) {
+  void _showGrowthReportDialog({Map<String, dynamic>? existingReport, String? reportId}) {
     final TextEditingController titleController =
         TextEditingController(text: existingReport?['title'] ?? '');
     final TextEditingController reportController =
@@ -1357,20 +1367,28 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           children: [
             TextField(
               controller: titleController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '제목',
                 hintText: '제목을 입력해주세요',
+                hintStyle: TextStyle(color: Colors.grey[400]),
                 border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.green),
+                ),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: reportController,
               maxLines: 5,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '내용',
                 hintText: '식물의 성장 과정이나 특이사항을 기록해보세요',
+                hintStyle: TextStyle(color: Colors.grey[400]),
                 border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.green),
+                ),
               ),
             ),
           ],
@@ -1462,7 +1480,10 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
             ),
-            child: Text(existingReport != null ? '수정' : '저장'),
+            child: Text(
+              existingReport != null ? '수정' : '저장',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -1508,10 +1529,12 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _showGrowthReportDialog(
-                  existingReport: report, reportId: reportId);
+              _showGrowthReportDialog(existingReport: report, reportId: reportId);
             },
-            child: const Text('수정', style: TextStyle(color: Colors.green)),
+            child: const Text(
+              '수정',
+              style: TextStyle(color: Colors.green),
+            ),
           ),
         ],
       ),
