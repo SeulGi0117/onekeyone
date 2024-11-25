@@ -4,6 +4,7 @@ import '../services/nongsaro_api_service.dart';
 import 'plant_detail_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:convert';
+import 'dart:async';
 
 class PlantStatusScreen extends StatefulWidget {
   final Map<String, dynamic> plant;
@@ -412,93 +413,153 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.refresh, color: Colors.green),
-                            onPressed: () async {
-                              // AI 분석 시작 알림
-                              String plantName = _nickname ?? widget.plant['name'];
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (BuildContext context) {
-                                  return AlertDialog(
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const CircularProgressIndicator(),
-                                        const SizedBox(height: 16),
-                                        Text('AI가 등록된 식물 "$plantName"의\n건강 상태를 분석 중이에요...'),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-
-                              try {
-                                // Firebase Realtime Database에서 건강 상태 가져오기
-                                final healthRef = FirebaseDatabase.instance
-                                    .ref()
-                                    .child('plants')
-                                    .child(widget.plant['id'])
-                                    .child('health_status');
-                                
-                                final snapshot = await healthRef.get();
-                                if (snapshot.exists) {
-                                  final healthData = Map<String, dynamic>.from(snapshot.value as Map);
-                                  
-                                  // 분석 완료 후 다이얼로그 닫기
-                                  if (mounted) {
-                                    Navigator.of(context).pop();
-                                    
-                                    // 결과 표시
-                                    showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: const Text('분석 완료'),
-                                          content: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text('$plantName의 건강 상태:'),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                healthData['status'] == 'healthy' 
-                                                    ? '건강한 상태입니다.' 
-                                                    : '질병이 감지되었습니다: ${healthData['disease']}',
-                                                style: TextStyle(
-                                                  color: healthData['status'] == 'healthy' 
-                                                      ? Colors.green 
-                                                      : Colors.red,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context),
-                                              child: const Text('확인'),
-                                            ),
+                          Row(
+                            children: [
+                              const Text(
+                                '실시간 식물 질병 진단하기',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.refresh, color: Colors.green),
+                                onPressed: () async {
+                                  // AI 분석 시작 알림
+                                  String plantName = _nickname ?? widget.plant['name'];
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (BuildContext context) {
+                                      return AlertDialog(
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const CircularProgressIndicator(),
+                                            const SizedBox(height: 16),
+                                            Text(
+                                                'AI가 등록된 식물 "$plantName"의\n건강 상태를 분석 중이에요...'),
                                           ],
-                                        );
-                                      },
-                                    );
-                                  }
-                                }
-                              } catch (e) {
-                                print('건강 상태 분석 오류: $e');
-                                if (mounted) {
-                                  Navigator.of(context).pop();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('건강 상태 분석 중 오류가 발생했습니다.'),
-                                      backgroundColor: Colors.red,
-                                    ),
+                                        ),
+                                      );
+                                    },
                                   );
-                                }
-                              }
-                            },
+
+                                  try {
+                                    // main.py 실행
+                                    print("Python 스크립트 실행 시작...");
+                                    final pythonProcess = await Process.start(
+                                      'python',
+                                      ['D:/my_plant/functions/ai_monitoring/main.py'],
+                                      runInShell: true,
+                                    );
+
+                                    // Python 프로세스의 출력을 실시간으로 확인
+                                    pythonProcess.stdout.transform(utf8.decoder).listen((data) {
+                                      print('Python 출력: $data');
+                                    });
+
+                                    pythonProcess.stderr.transform(utf8.decoder).listen((data) {
+                                      print('Python 오류: $data');
+                                    });
+
+                                    // 실시간 이미지 확인
+                                    final imageRef = FirebaseDatabase.instance
+                                        .ref()
+                                        .child(widget.plant['sensorNode'])
+                                        .child('ESP32CAM');
+
+                                    final snapshot = await imageRef.get();
+                                    if (snapshot.exists) {
+                                      // AI 모니터링 실행 트리거
+                                      final monitoringRef = FirebaseDatabase
+                                          .instance
+                                          .ref()
+                                          .child('ai_monitoring')
+                                          .child('trigger');
+
+                                      // 분석 요청 데이터 설정
+                                      await monitoringRef.set({
+                                        'plantId': widget.plant['id'],
+                                        'sensorNode':
+                                            widget.plant['sensorNode'],
+                                        'timestamp':
+                                            DateTime.now().toIso8601String(),
+                                        'requestType': 'manual', // 수동 요청임을 표시
+                                      });
+
+                                      // status 변경 대기
+                                      bool analysisComplete = false;
+                                      StreamSubscription? subscription;
+
+                                      subscription = FirebaseDatabase.instance
+                                          .ref()
+                                          .child('plants')
+                                          .child(widget.plant['id'])
+                                          .child('status')
+                                          .onValue
+                                          .listen((event) async {
+                                        if (event.snapshot.value != null) {
+                                          analysisComplete = true;
+                                          await subscription?.cancel();
+
+                                          // Python 프로세스 종료
+                                          pythonProcess.kill();
+
+                                          if (mounted) {
+                                            Navigator.of(context)
+                                                .pop(); // 로딩 다이얼로그 닫기
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    '식물 건강 상태 분석이 완료되었습니다.'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      });
+
+                                      // 30초 타임아웃
+                                      await Future.delayed(
+                                          const Duration(seconds: 30));
+                                      if (!analysisComplete) {
+                                        await subscription?.cancel();
+                                        pythonProcess.kill();
+                                        if (mounted) {
+                                          Navigator.of(context).pop();
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  '분석 시간이 초과되었습니다. 다시 시도해주세요.'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    } else {
+                                      throw Exception('실시간 이미지를 찾을 수 없습니다.');
+                                    }
+                                  } catch (e) {
+                                    print('건강 상태 분석 오류: $e');
+                                    if (mounted) {
+                                      Navigator.of(context).pop();
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content:
+                                              Text('건강 상태 분석 중 오류가 발생했습니다.'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -510,7 +571,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                             .child(widget.plant['id'])
                             .onValue,
                         builder: (context, snapshot) {
-                          if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+                          if (!snapshot.hasData ||
+                              snapshot.data?.snapshot.value == null) {
                             return _buildHealthRow(
                               Icons.favorite,
                               '건강 상태',
@@ -519,7 +581,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                             );
                           }
 
-                          final plantData = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
+                          final plantData = Map<String, dynamic>.from(
+                              snapshot.data!.snapshot.value as Map);
                           final status = plantData['status'];
 
                           // 상태가 없거나 Unknown인 경우
@@ -533,7 +596,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                           }
 
                           // 건강한 상태인 경우 (plant___healthy 포함)
-                          if (status == 'healthy' || status == 'plant___healthy') {
+                          if (status == 'healthy' ||
+                              status == 'plant___healthy') {
                             return _buildHealthRow(
                               Icons.favorite,
                               '건강 상태',
@@ -547,19 +611,22 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                             future: FirebaseDatabase.instance
                                 .ref()
                                 .child('plant_diseases')
-                                .child(status.replaceAll(' ', '_'))  // 공백을 _로 변환
+                                .child(status.replaceAll(' ', '_')) // 공백을 _로 변환
                                 .get(),
                             builder: (context, diseaseSnapshot) {
-                              if (!diseaseSnapshot.hasData || diseaseSnapshot.data?.value == null) {
+                              if (!diseaseSnapshot.hasData ||
+                                  diseaseSnapshot.data?.value == null) {
                                 // 첫 번째 시도 실패 시, 끝에 _ 추가해서 다시 시도
                                 return FutureBuilder<DataSnapshot>(
                                   future: FirebaseDatabase.instance
                                       .ref()
                                       .child('plant_diseases')
-                                      .child('${status.replaceAll(' ', '_')}_')  // 끝에 _ 추가
+                                      .child(
+                                          '${status.replaceAll(' ', '_')}_') // 끝에 _ 추가
                                       .get(),
                                   builder: (context, retrySnapshot) {
-                                    if (!retrySnapshot.hasData || retrySnapshot.data?.value == null) {
+                                    if (!retrySnapshot.hasData ||
+                                        retrySnapshot.data?.value == null) {
                                       return _buildHealthRow(
                                         Icons.favorite,
                                         '건강 상태',
@@ -568,8 +635,11 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                                       );
                                     }
 
-                                    final diseaseData = Map<String, dynamic>.from(retrySnapshot.data!.value as Map);
-                                    final koreanName = diseaseData['한국어_병명'] ?? status;
+                                    final diseaseData =
+                                        Map<String, dynamic>.from(
+                                            retrySnapshot.data!.value as Map);
+                                    final koreanName =
+                                        diseaseData['한국어_병명'] ?? status;
 
                                     return _buildHealthRow(
                                       Icons.favorite,
@@ -583,8 +653,10 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                                 );
                               }
 
-                              final diseaseData = Map<String, dynamic>.from(diseaseSnapshot.data!.value as Map);
-                              final koreanName = diseaseData['한국어_병명'] ?? status;
+                              final diseaseData = Map<String, dynamic>.from(
+                                  diseaseSnapshot.data!.value as Map);
+                              final koreanName =
+                                  diseaseData['한국어_병명'] ?? status;
 
                               return _buildHealthRow(
                                 Icons.favorite,
@@ -1008,16 +1080,18 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
       onTap: () async {
         if (value != '건강함' && value != '분석 대기중') {
           try {
-            // Firebase에서 질병 정보를 가져옵 때 originalStatus 사용
+            // Firebase에서 질병 정보를 가져올 때 originalStatus 사용
             final diseaseRef = FirebaseDatabase.instance
                 .ref()
                 .child('plant_diseases')
-                .child((originalStatus ?? value).replaceAll(' ', '_')); // originalStatus가 있으면 사용
-            
+                .child((originalStatus ?? value)
+                    .replaceAll(' ', '_')); // originalStatus가 있으면 사용
+
             final snapshot = await diseaseRef.get();
             if (snapshot.exists) {
-              final diseaseData = Map<String, dynamic>.from(snapshot.value as Map);
-              
+              final diseaseData =
+                  Map<String, dynamic>.from(snapshot.value as Map);
+
               if (!mounted) return;
               showDialog(
                 context: context,
@@ -1040,7 +1114,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.local_hospital, color: Colors.white),
+                            const Icon(Icons.local_hospital,
+                                color: Colors.white),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1053,7 +1128,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.close, color: Colors.white),
+                              icon:
+                                  const Icon(Icons.close, color: Colors.white),
                               onPressed: () => Navigator.pop(context),
                             ),
                           ],
@@ -1167,7 +1243,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
     );
   }
 
-  Widget _buildDiseaseDetailSection(String title, String content, IconData icon) {
+  Widget _buildDiseaseDetailSection(
+      String title, String content, IconData icon) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1564,7 +1641,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
   }
 
   // _showGrowthReportDialog 메서드 수정
-  void _showGrowthReportDialog({Map<String, dynamic>? existingReport, String? reportId}) {
+  void _showGrowthReportDialog(
+      {Map<String, dynamic>? existingReport, String? reportId}) {
     final TextEditingController titleController =
         TextEditingController(text: existingReport?['title'] ?? '');
     final TextEditingController reportController =
@@ -1741,7 +1819,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _showGrowthReportDialog(existingReport: report, reportId: reportId);
+              _showGrowthReportDialog(
+                  existingReport: report, reportId: reportId);
             },
             child: const Text(
               '수정',
