@@ -56,7 +56,21 @@ class PlantListScreen extends StatelessWidget {
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('상태: $status'),
+                          Row(
+                            children: [
+                              const Icon(Icons.favorite, size: 16, color: Colors.green),
+                              const SizedBox(width: 4),
+                              FutureBuilder<String>(
+                                future: _getKoreanStatus(plant['status']),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData) {
+                                    return Text('상태: ${snapshot.data}');
+                                  }
+                                  return Text('상태: ${plant['status']}');
+                                },
+                              ),
+                            ],
+                          ),
                           if (plant['temperature'] != null)
                             Text('온도: ${plant['temperature']}°C'),
                           if (plant['humidity'] != null)

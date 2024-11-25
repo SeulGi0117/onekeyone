@@ -311,7 +311,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const Icon(Icons.favorite,
                                     size: 16, color: Colors.green),
                                 const SizedBox(width: 4),
-                                Text('상태: ${plant['status']}'),
+                                FutureBuilder<String>(
+                                  future: _getKoreanStatus(plant['status']),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData) {
+                                      return Text('상태: ${snapshot.data}');
+                                    }
+                                    return Text('상태: ${plant['status']}');
+                                  },
+                                ),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -450,6 +458,46 @@ class _HomeScreenState extends State<HomeScreen> {
       return '${date.year}-${date.month}-${date.day}';
     } catch (e) {
       return '정보 없음';
+    }
+  }
+
+  Future<String> _getKoreanStatus(String? status) async {
+    if (status == null) return '상태 정보 없음';
+    
+    // 건강한 상태 처리
+    if (status == 'healthy' || status == 'plant___healthy') {
+      return '건강함';
+    }
+
+    try {
+      // Firebase에서 질병 정보 가져오기
+      final snapshot = await FirebaseDatabase.instance
+          .ref()
+          .child('plant_diseases')
+          .child(status.replaceAll(' ', '_'))
+          .get();
+
+      if (snapshot.exists) {
+        final diseaseData = Map<String, dynamic>.from(snapshot.value as Map);
+        return diseaseData['한국어_병명'] ?? status;
+      }
+
+      // 첫 번째 시도 실패 시 끝에 _를 추가하여 재시도
+      final retrySnapshot = await FirebaseDatabase.instance
+          .ref()
+          .child('plant_diseases')
+          .child('${status.replaceAll(' ', '_')}_')
+          .get();
+
+      if (retrySnapshot.exists) {
+        final diseaseData = Map<String, dynamic>.from(retrySnapshot.value as Map);
+        return diseaseData['한국어_병명'] ?? status;
+      }
+
+      return status;
+    } catch (e) {
+      print('상태 변환 오류: $e');
+      return status;
     }
   }
 }
