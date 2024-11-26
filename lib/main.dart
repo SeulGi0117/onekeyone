@@ -16,7 +16,7 @@ Future<void> initializeFirebase() async {
     );
     
     await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.debug,
+      androidProvider: AndroidProvider.playIntegrity,
     );
     
     print('Firebase 초기화 완료');
