@@ -425,11 +425,13 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                               ),
                               const SizedBox(width: 8),
                               IconButton(
-                                icon: const Icon(Icons.refresh, color: Colors.green),
+                                icon: const Icon(Icons.refresh,
+                                    color: Colors.green),
                                 onPressed: () async {
                                   try {
                                     // 분석 시작 알림
-                                    String plantName = _nickname ?? widget.plant['name'];
+                                    String plantName =
+                                        _nickname ?? widget.plant['name'];
                                     showDialog(
                                       context: context,
                                       barrierDismissible: false,
@@ -449,30 +451,46 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                                     );
 
                                     // Cloud Function 호출
-                                    final functions = FirebaseFunctions.instanceFor(region: 'asia-northeast3');
-                                    final result = await functions.httpsCallable('runPlantAnalysis').call({
+                                    final functions =
+                                        FirebaseFunctions.instanceFor(
+                                            region: 'asia-northeast3');
+                                    final result = await functions
+                                        .httpsCallable('runPlantAnalysis')
+                                        .call({
                                       'plantId': widget.plant['id'],
                                       'sensorNode': widget.plant['sensorNode'],
-                                    });
+                                    }).timeout(
+                                      const Duration(seconds: 30),
+                                      onTimeout: () {
+                                        throw TimeoutException(
+                                            '분석 시간이 초과되었습니다.');
+                                      },
+                                    );
 
-                                    if (result.data['success']) {
-                                      if (mounted) {
-                                        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                    if (mounted) {
+                                      Navigator.of(context)
+                                          .pop(); // 로딩 다이얼로그 닫기
+
+                                      if (result.data['success']) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           const SnackBar(
-                                            content: Text('식물 건강 상태 분석이 시작되었습니다. 잠시 후 결과를 확인해주세요.'),
+                                            content:
+                                                Text('식물 건강 상태 분석이 완료되었습니다.'),
                                             backgroundColor: Colors.green,
                                           ),
                                         );
                                       }
                                     }
                                   } catch (e) {
-                                    print('건강 상태 분석 오류: $e');
                                     if (mounted) {
-                                      Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('건강 상태 분석 중 오류가 발생했습니다.'),
+                                      Navigator.of(context)
+                                          .pop(); // 로딩 다이얼로그 닫기
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              '건강 상태 분석 중 오류가 발생했습니다: ${e.toString()}'),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
