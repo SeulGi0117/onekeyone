@@ -6,11 +6,12 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // App Check 설정 수정
+  // 개발 중에는 debug 프로바이더 사용
   await FirebaseAppCheck.instance.activate(
     androidProvider: AndroidProvider.debug,
   );

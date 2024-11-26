@@ -100,18 +100,12 @@ class PlantHealthMonitor:
                 encoded_image = encoded_image.split(",")[1]
             
             image_data = base64.b64decode(encoded_image)
-            
-            # 임시 파일로 저장
-            temp_image_path = f"temp_{node_path}_image.jpg"
-            with open(temp_image_path, 'wb') as f:
-                f.write(image_data)
-            
-            image = Image.open(temp_image_path).convert("RGB")
+            image = Image.open(io.BytesIO(image_data)).convert("RGB")
             print(f"실시간 이미지 가져오기 완료")
-            return image, temp_image_path
+            return image
         except Exception as e:
             print(f"실시간 이미지 가져오기 실패: {e}")
-            return None, None
+            return None
 
     def analyze_with_yolo(self, image):
         """YOLO 분석 수행"""
@@ -162,8 +156,7 @@ class PlantHealthMonitor:
             print(f"상태 업데이트 실패: {e}")
 
     def process_plant(self, sensor_node, plant_id):
-        log_with_timestamp(f"식물 분석 시작 - Plant ID: {plant_id}, Node: {sensor_node}")
-        temp_image_path = None
+        """단일 식물 처리"""
         try:
             print(f"\n{'='*50}")
             print(f"식물 ID: {plant_id} 분석 프로세스 시작")
@@ -171,7 +164,7 @@ class PlantHealthMonitor:
             
             # 이미지 가져오기
             print("\n1. 실시간 이미지 가져오기 시작...")
-            image, temp_image_path = self.get_image_from_firebase(sensor_node)
+            image = self.get_image_from_firebase(sensor_node)
             if image is None:
                 print("❌ 이미지를 가져올 수 없음 - status를 'Unknown'으로 업데이트")
                 plant_ref = db.reference(f'plants/{plant_id}')
@@ -184,7 +177,7 @@ class PlantHealthMonitor:
             
             # YOLO 분석
             print("\n2. YOLO 모델 분석 시작...")
-            results = self.analyze_with_yolo(temp_image_path)  # 임시 저장된 파일 경로 사용
+            results = self.analyze_with_yolo(image)
             if results is None:
                 print("❌ YOLO 분석 실패 - status를 'Unknown'으로 업데이트")
                 plant_ref = db.reference(f'plants/{plant_id}')
@@ -252,16 +245,6 @@ class PlantHealthMonitor:
                 print(f"오류로 인해 status를 'Unknown'으로 업데이트")
             except Exception as update_error:
                 print(f"상태 업데이트 실패: {update_error}")
-        finally:
-            # 임시 파일 삭제
-            if temp_image_path and os.path.exists(temp_image_path):
-                try:
-                    os.remove(temp_image_path)
-                    print(f"임시 이미지 파일 삭제 완료: {temp_image_path}")
-                except Exception as e:
-                    print(f"임시 파일 삭제 실패: {e}")
-                    
-        log_with_timestamp(f"식물 분석 완료 - Plant ID: {plant_id}")
 
     def check_all_plants(self):
         log_with_timestamp("모든 식물 체크 시작")
@@ -297,64 +280,36 @@ def main():
         
         def handle_trigger(event):
             if event.data:
-                trigger_data = event.data
-                plant_id = trigger_data.get('plantId')
-                sensor_node = trigger_data.get('sensorNode')
-                request_type = trigger_data.get('requestType')
+                log_with_timestamp(f"\n{'='*50}")
+                log_with_timestamp("분석 요청 감지! 모든 식물 분석을 시작합니다.")
                 
-                if request_type == 'check_all':
-                    # 모든 식물 체크 요청
-                    log_with_timestamp("전체 식물 체크 요청 감지")
-                    monitor.check_all_plants()
-                elif plant_id and sensor_node:
-                    # 단일 식물 체크 요청 후 모든 노드 순차 검사
-                    log_with_timestamp(f"\n{'='*50}")
-                    log_with_timestamp(f"단일 식물 분석 요청 감지!")
-                    log_with_timestamp(f"요청 유형: {request_type}")
-                    log_with_timestamp(f"Plant ID: {plant_id}")
-                    log_with_timestamp(f"센서 노드: {sensor_node}")
-                    log_with_timestamp(f"{'='*50}\n")
+                try:
+                    # 모든 식물 분석
+                    nodes = ['JSON', 'JSON2', 'JSON3']
+                    plants_ref = db.reference('plants')
+                    plants = plants_ref.get()
                     
-                    try:
-                        # 먼저 요청된 식물 분석
-                        monitor.process_plant(sensor_node, plant_id)
+                    if plants:
+                        total_plants = len(plants)
+                        current_count = 0
                         
-                        # 상태 업데이트 확인
-                        ref = db.reference(f'plants/{plant_id}/health_status')
-                        status_data = ref.get()
-                        
-                        if status_data and status_data.get('status'):
-                            log_with_timestamp(f"상태 업데이트 성공: {status_data.get('status')}")
-                        else:
-                            log_with_timestamp("상태 업데이트 실패 - 기본값으로 설정")
-                            ref.set({
-                                'status': 'Unknown',
-                                'timestamp': datetime.now().isoformat()
-                            })
-                        
-                        # 나머지 모든 노드의 식물들 분석
-                        nodes = ['JSON', 'JSON2', 'JSON3']
-                        plants_ref = db.reference('plants')
-                        plants = plants_ref.get()
-                        
-                        if plants:
-                            for other_plant_id, plant_data in plants.items():
-                                if other_plant_id != plant_id:  # 이미 분석한 식물 제외
-                                    node = plant_data.get('sensorNode')
-                                    if node in nodes:
-                                        log_with_timestamp(f"추가 식물 분석 시작 - ID: {other_plant_id}, Node: {node}")
-                                        monitor.process_plant(node, other_plant_id)
-                        
-                        # 모든 분석이 끝난 후 트리거 초기화
-                        log_with_timestamp("트리거 초기화 중...")
-                        db.reference('ai_monitoring/trigger').set({})
-                        log_with_timestamp("트리거 초기화 완료")
-                        
-                    except Exception as e:
-                        log_with_timestamp(f"분석 중 오류 발생: {e}")
-                        db.reference('ai_monitoring/trigger').set({})
-                else:
-                    log_with_timestamp("필수 정보 누락: plant_id 또는 sensor_node가 없습니다.")
+                        for plant_id, plant_data in plants.items():
+                            current_count += 1
+                            node = plant_data.get('sensorNode')
+                            if node in nodes:
+                                log_with_timestamp(f"식물 분석 시작 ({current_count}/{total_plants}) - ID: {plant_id}, Node: {node}")
+                                monitor.process_plant(node, plant_id)
+                    
+                    log_with_timestamp("모든 식물 분석 완료")
+                    
+                    # 모든 분석이 끝난 후 트리거 초기화
+                    log_with_timestamp("트리거 초기화 중...")
+                    db.reference('ai_monitoring/trigger').set({})
+                    log_with_timestamp("트리거 초기화 완료")
+                    
+                except Exception as e:
+                    log_with_timestamp(f"분석 중 오류 발생: {e}")
+                    db.reference('ai_monitoring/trigger').set({})
         
         db.reference('ai_monitoring/trigger').listen(handle_trigger)
         log_with_timestamp("식물 건강 모니터링 시작...")

@@ -47,3 +47,4 @@ app.*.map.json
 .env.local
 .env.*
 "functions/src/model/aaaa-8a6a5-firebase-adminsdk-1wmfe-d3f93bba70.json" 
+functions/src/model/aaaa-8a6a5-firebase-adminsdk-1wmfe-d3f93bba70.json
