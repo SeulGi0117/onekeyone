@@ -271,7 +271,6 @@ def main():
         plant_id = sys.argv[1]
         sensor_node = sys.argv[2]
         
-        log_with_timestamp(f"단일 식물 분석 모드 - Plant ID: {plant_id}, Node: {sensor_node}")
         monitor = PlantHealthMonitor()
         monitor.process_plant(sensor_node, plant_id)
     else:

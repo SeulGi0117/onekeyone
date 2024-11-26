@@ -1,25 +1,50 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/home_screen.dart';
 import 'firebase_options.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
-  // 개발 중에는 debug 프로바이더 사용
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
-  );
-  
-  runApp(const MyApp());
+Future<void> initializeFirebase() async {
+  try {
+    if (Firebase.apps.isNotEmpty) {
+      await Firebase.app().delete();
+    }
+    
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.debug,
+    );
+    
+    print('Firebase 초기화 완료');
+  } catch (e) {
+    print('Firebase 초기화 오류: $e');
+    throw e;
+  }
 }
 
-// 에러 표시용 위젯
+void main() async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    await dotenv.load(fileName: ".env");
+    
+    print('Firebase 초기화 시작...');
+    await initializeFirebase();
+    print('Firebase AppCheck 활성화 완료');
+    
+    runApp(const MyApp());
+  } catch (e, stackTrace) {
+    print('초기화 중 오류 발생: $e');
+    print('Stack trace: $stackTrace');
+    runApp(ErrorApp(error: e.toString()));
+  }
+}
+
+// ErrorApp 위젯 수정
 class ErrorApp extends StatelessWidget {
   final String error;
 
@@ -35,12 +60,25 @@ class ErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  '앱 초기화 중 오류가 발생했습니다',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 48,
                 ),
                 const SizedBox(height: 16),
-                Text(error, style: const TextStyle(color: Colors.red)),
+                const Text(
+                  '앱 초기화 중 오류가 발생했습니다',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  error,
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),

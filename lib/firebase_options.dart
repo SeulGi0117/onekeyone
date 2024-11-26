@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     return const FirebaseOptions(
-      apiKey: 'your-api-key',
-      appId: 'your-app-id',
-      messagingSenderId: 'your-sender-id',
+      apiKey: 'AIzaSyCAaKThKeVChc9Z1i0OxBBK7C_HbofaS94',
+      appId: '1:411960763521:android:ebbe4d5580fcbec4fc1980',
+      messagingSenderId: '411960763521',
       projectId: 'aaaa-8a6a5',
       databaseURL: 'https://aaaa-8a6a5-default-rtdb.firebaseio.com',
     );

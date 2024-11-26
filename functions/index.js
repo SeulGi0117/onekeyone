@@ -11,9 +11,8 @@ exports.runPlantAnalysis = functions
     const { plantId, sensorNode } = data;
     
     try {
-      // AI 모니터링 트리거 설정
+      // 1. Firebase Realtime Database에 트리거 설정
       const triggerRef = admin.database().ref('ai_monitoring/trigger');
-      
       await triggerRef.set({
         plantId: plantId,
         sensorNode: sensorNode,
@@ -22,16 +21,13 @@ exports.runPlantAnalysis = functions
         status: 'pending'
       });
 
-      // Python 스크립트 실행
+      // 2. Python 스크립트 실행
       const options = {
-        mode: 'text',
         pythonPath: 'python3',
-        pythonOptions: ['-u'],
         scriptPath: path.join(__dirname, 'ai_monitoring'),
         args: [plantId, sensorNode]
       };
 
-      // Python 스크립트 실행 및 결과 대기
       await new Promise((resolve, reject) => {
         PythonShell.run('main.py', options, function (err) {
           if (err) reject(err);
