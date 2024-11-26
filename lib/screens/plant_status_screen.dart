@@ -226,8 +226,24 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           bottom: TabBar(
             controller: _tabController,
             tabs: const [
-              Tab(text: '실시간 데이터'),
-              Tab(text: '식물 정보'),
+              Tab(
+                child: Text(
+                  '실시간 데이터',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Tab(
+                child: Text(
+                  '식물 정보',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ],
             labelColor: Colors.green,
             unselectedLabelColor: Colors.grey,
@@ -410,7 +426,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                           const Text(
                             '식물 건강 상태',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 30,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -419,8 +435,9 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                               const Text(
                                 '실시간 식물 질병 진단하기',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 18,
                                   color: Colors.green,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -443,7 +460,8 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                                               const CircularProgressIndicator(),
                                               const SizedBox(height: 16),
                                               Text(
-                                                  'AI가 등록된 식물 "$plantName"의\n건강 상태를 분석 중이에요...'),
+                                                'AI가 등록된 식물 "$plantName"의\n건강 상태를 분석 중이에요...',
+                                              ),
                                             ],
                                           ),
                                         );
@@ -679,7 +697,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                           } else {
                             statusColor = Colors.blue;
                             statusText = '적정수준';
-                            additionalInfo = '현재 온도가 적정 범위 내에 있습니다';
+                            additionalInfo = '현재 온도가 적정 범위 내에 ���습니다';
                           }
 
                           return _buildHealthRow(
@@ -887,7 +905,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           const SizedBox(height: 16),
 
           // 기본 정보
-          _buildInfoSection('기본 보', [
+          _buildInfoSection('기본 정보', [
             if (plantInfo['koreanName'] != null)
               _buildInfoRow('한글명', plantInfo['koreanName']),
             if (plantInfo['englishName'] != null)
@@ -934,16 +952,6 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 _buildInfoRow('특별관리', plantInfo['managementInfo']['special']),
             ]),
 
-          // 병충해 정보 섹션 추가 (기존 병충해 관리 정보와 함께 표시)
-          if (plantInfo['pestInfo'] != null ||
-              plantInfo['pestControlInfo'] != null)
-            _buildInfoSection('병충해 정보', [
-              if (plantInfo['pestInfo'] != null)
-                _buildInfoRow('발생 병충해', plantInfo['pestInfo']),
-              if (plantInfo['pestControlInfo'] != null)
-                _buildInfoRow('관리 방법', plantInfo['pestControlInfo']),
-            ]),
-
           // 환경 정보
           if (plantInfo['environmentInfo'] != null &&
               (plantInfo['environmentInfo'] as Map).isNotEmpty)
@@ -974,16 +982,36 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 _buildInfoRow('겨울', plantInfo['waterCycle']['winter']),
             ]),
 
+          // 병충해 정보 섹션 추가 (기존 병충해 관리 정보와 함께 표시)
+          if (plantInfo['pestInfo'] != null ||
+              plantInfo['pestControlInfo'] != null)
+            _buildInfoSection('병충해 정보', [
+              if (plantInfo['pestInfo'] != null)
+                _buildInfoRow('발생 병충해', plantInfo['pestInfo']),
+              if (plantInfo['pestControlInfo'] != null)
+                _buildInfoRow('관리 방법', plantInfo['pestControlInfo']),
+            ]),
+
           // 기능성 정보
           if (plantInfo['functionInfo'] != null)
             _buildInfoSection('기능성 정보', [
-              Text(plantInfo['functionInfo']),
+              Text(
+                plantInfo['functionInfo'],
+                style: const TextStyle(
+                  fontSize: 18,
+                ),
+              ),
             ]),
 
           // 독성 정보
           if (plantInfo['toxicity'] != null)
             _buildInfoSection('독성 정보', [
-              Text(plantInfo['toxicity']),
+              Text(
+                plantInfo['toxicity'],
+                style: const TextStyle(
+                  fontSize: 18,
+                ),
+              ),
             ]),
         ],
       ),
@@ -997,9 +1025,10 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
         leading: Icon(icon, color: color, size: 30),
         title: Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 16,
-            color: Colors.grey[600],
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
         trailing: Text(
@@ -1007,6 +1036,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
       ),
@@ -1148,9 +1178,10 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                 const SizedBox(width: 12),
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
                 const Spacer(),
@@ -1229,31 +1260,32 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
         Text(
           title,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Colors.green,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         ...children,
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
       ],
     );
   }
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 140,
             child: Text(
               label,
               style: TextStyle(
+                fontSize: 18,
                 color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -1261,6 +1293,7 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
             child: Text(
               value,
               style: const TextStyle(
+                fontSize: 18,
                 color: Colors.black87,
               ),
             ),
@@ -1337,7 +1370,13 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
         return Card(
           child: ListTile(
             leading: const Icon(Icons.camera_alt, color: Colors.green),
-            title: const Text('실시간 식물 사진 보기'),
+            title: const Text(
+              '실시간 식물 사진 보기',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             subtitle:
                 Text('최근 업데이트: ${DateTime.now().toString().substring(11, 16)}'),
             onTap: () {
@@ -1416,7 +1455,13 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
         Card(
           child: ListTile(
             leading: const Icon(Icons.note_alt, color: Colors.green),
-            title: const Text('성장 보고서'),
+            title: const Text(
+              '성장 보고서',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             subtitle: const Text('식물의 성장 과정을 기록해보세요!'),
             onTap: () => _showGrowthReportDialog(),
           ),

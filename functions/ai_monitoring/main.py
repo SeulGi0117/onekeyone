@@ -280,28 +280,42 @@ def main():
         def handle_trigger(event):
             if event.data:
                 log_with_timestamp(f"\n{'='*50}")
-                log_with_timestamp("분석 요청 감지! 모든 식물 분석을 시작합니다.")
+                log_with_timestamp("분석 요청 감지! 분석을 시작합니다.")
                 
                 try:
-                    # 모든 식물 분석
-                    nodes = ['JSON', 'JSON2', 'JSON3']
-                    plants_ref = db.reference('plants')
-                    plants = plants_ref.get()
+                    # 트리거 데이터 확인
+                    trigger_data = event.data
+                    request_type = trigger_data.get('requestType')
                     
-                    if plants:
-                        total_plants = len(plants)
-                        current_count = 0
+                    if request_type == 'manual':
+                        # 단일 식물 분석
+                        plant_id = trigger_data.get('plantId')
+                        sensor_node = trigger_data.get('sensorNode')
                         
-                        for plant_id, plant_data in plants.items():
-                            current_count += 1
-                            node = plant_data.get('sensorNode')
-                            if node in nodes:
-                                log_with_timestamp(f"식물 분석 시작 ({current_count}/{total_plants}) - ID: {plant_id}, Node: {node}")
-                                monitor.process_plant(node, plant_id)
+                        if plant_id and sensor_node:
+                            log_with_timestamp(f"식물 분석 시작 - ID: {plant_id}, Node: {sensor_node}")
+                            monitor.process_plant(sensor_node, plant_id)
+                            log_with_timestamp("식물 분석 완료")
+                    else:
+                        # 모든 식물 분석
+                        nodes = ['JSON', 'JSON2', 'JSON3']
+                        plants_ref = db.reference('plants')
+                        plants = plants_ref.get()
+                        
+                        if plants:
+                            total_plants = len(plants)
+                            current_count = 0
+                            
+                            for plant_id, plant_data in plants.items():
+                                current_count += 1
+                                node = plant_data.get('sensorNode')
+                                if node in nodes:
+                                    log_with_timestamp(f"식물 분석 시작 ({current_count}/{total_plants}) - ID: {plant_id}, Node: {node}")
+                                    monitor.process_plant(node, plant_id)
+                        
+                        log_with_timestamp("모든 식물 분석 완료")
                     
-                    log_with_timestamp("모든 식물 분석 완료")
-                    
-                    # 모든 분석이 끝난 후 트리거 초기화
+                    # 트리거 초기화
                     log_with_timestamp("트리거 초기화 중...")
                     db.reference('ai_monitoring/trigger').set({})
                     log_with_timestamp("트리거 초기화 완료")

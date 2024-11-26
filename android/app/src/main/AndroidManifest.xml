@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="platn_demo01"
-        android:name="${applicationName}"
+        android:name="${one.key.one}"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

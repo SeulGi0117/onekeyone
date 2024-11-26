@@ -10,7 +10,7 @@ exports.runPlantAnalysis = https.onCall(async (data, context) => {
   const { plantId, sensorNode } = data;
   
   try {
-    // 1. Firebase Realtime Database에 트리거 설정
+    // Firebase Realtime Database에 트리거 설정
     const db = getDatabase();
     const triggerRef = db.ref('ai_monitoring/trigger');
     await triggerRef.set({
@@ -21,53 +21,30 @@ exports.runPlantAnalysis = https.onCall(async (data, context) => {
       status: 'pending'
     });
 
-    // 2. Python 스크립트 실행
-    const options = {
-      mode: 'text',
-      pythonPath: 'python',
-      pythonOptions: ['-u'],
-      scriptPath: path.join(__dirname, 'ai_monitoring'),
-      args: [plantId, sensorNode]
-    };
-
-    try {
-      await new Promise((resolve, reject) => {
-        PythonShell.run('main.py', options, function (err, results) {
-          if (err) {
-            console.error('Python 스크립트 실행 오류:', err);
-            reject(err);
-          }
-          console.log('Python 스크립트 실행 결과:', results);
-          resolve(results);
-        });
-      });
-
-      // 분석 완료 확인
+    // 분석 완료 대기 (최대 30초)
+    let attempts = 0;
+    const maxAttempts = 30;
+    
+    while (attempts < maxAttempts) {
       const snapshot = await triggerRef.once('value');
       const triggerData = snapshot.val();
       
       if (!triggerData || Object.keys(triggerData).length === 0) {
         return { 
           success: true, 
-          message: '분석이 완료되었습니다.',
+          message: '식물 상태 분석이 완료되었습니다.',
           status: 'completed'
         };
       }
       
-      return {
-        success: false,
-        message: '분석 처리 중 오류가 발생했습니다.',
-        status: 'error'
-      };
-
-    } catch (pythonError) {
-      console.error('Python 실행 오류:', pythonError);
-      throw new https.HttpsError('internal', 
-        `Python 스크립트 실행 오류: ${pythonError.message}`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
     }
+    
+    throw new Error('분석 시간 초과');
 
   } catch (error) {
-    console.error('전체 실행 오류:', error);
+    console.error('실행 오류:', error);
     throw new https.HttpsError('internal', 
       `분석 중 오류가 발생했습니다: ${error.message}`);
   }

@@ -25,11 +25,24 @@ android {
         targetSdkVersion flutter.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+        manifestPlaceholders = [applicationName: "one.key.one"]
+        manifestPlaceholders = [
+            'appAuthRedirectScheme': 'one.key.one'
+        ]
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.debug
+        }
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file("debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
         }
     }
 }
