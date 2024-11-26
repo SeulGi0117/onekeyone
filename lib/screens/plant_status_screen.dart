@@ -5,6 +5,7 @@ import 'plant_detail_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class PlantStatusScreen extends StatefulWidget {
   final Map<String, dynamic> plant;
@@ -426,132 +427,52 @@ class _PlantStatusScreenState extends State<PlantStatusScreen>
                               IconButton(
                                 icon: const Icon(Icons.refresh, color: Colors.green),
                                 onPressed: () async {
-                                  // AI 분석 시작 알림
-                                  String plantName = _nickname ?? widget.plant['name'];
-                                  showDialog(
-                                    context: context,
-                                    barrierDismissible: false,
-                                    builder: (BuildContext context) {
-                                      return AlertDialog(
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const CircularProgressIndicator(),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                                'AI가 등록된 식물 "$plantName"의\n건강 상태를 분석 중이에요...'),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  );
-
                                   try {
-                                    // main.py 실행
-                                    print("Python 스크립트 실행 시작...");
-                                    final pythonProcess = await Process.start(
-                                      'python',
-                                      ['D:/my_plant/functions/ai_monitoring/main.py'],
-                                      runInShell: true,
+                                    // 분석 시작 알림
+                                    String plantName = _nickname ?? widget.plant['name'];
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const CircularProgressIndicator(),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                  'AI가 등록된 식물 "$plantName"의\n건강 상태를 분석 중이에요...'),
+                                            ],
+                                          ),
+                                        );
+                                      },
                                     );
 
-                                    // Python 프로세스의 출력을 실시간으로 확인
-                                    pythonProcess.stdout.transform(utf8.decoder).listen((data) {
-                                      print('Python 출력: $data');
+                                    // Cloud Function 호출
+                                    final functions = FirebaseFunctions.instanceFor(region: 'asia-northeast3');
+                                    final result = await functions.httpsCallable('runPlantAnalysis').call({
+                                      'plantId': widget.plant['id'],
+                                      'sensorNode': widget.plant['sensorNode'],
                                     });
 
-                                    pythonProcess.stderr.transform(utf8.decoder).listen((data) {
-                                      print('Python 오류: $data');
-                                    });
-
-                                    // 실시간 이미지 확인
-                                    final imageRef = FirebaseDatabase.instance
-                                        .ref()
-                                        .child(widget.plant['sensorNode'])
-                                        .child('ESP32CAM');
-
-                                    final snapshot = await imageRef.get();
-                                    if (snapshot.exists) {
-                                      // AI 모니터링 실행 트리거
-                                      final monitoringRef = FirebaseDatabase
-                                          .instance
-                                          .ref()
-                                          .child('ai_monitoring')
-                                          .child('trigger');
-
-                                      // 분석 요청 데이터 설정
-                                      await monitoringRef.set({
-                                        'plantId': widget.plant['id'],
-                                        'sensorNode':
-                                            widget.plant['sensorNode'],
-                                        'timestamp':
-                                            DateTime.now().toIso8601String(),
-                                        'requestType': 'manual', // 수동 요청임을 표시
-                                      });
-
-                                      // status 변경 대기
-                                      bool analysisComplete = false;
-                                      StreamSubscription? subscription;
-
-                                      subscription = FirebaseDatabase.instance
-                                          .ref()
-                                          .child('plants')
-                                          .child(widget.plant['id'])
-                                          .child('status')
-                                          .onValue
-                                          .listen((event) async {
-                                        if (event.snapshot.value != null) {
-                                          analysisComplete = true;
-                                          await subscription?.cancel();
-
-                                          // Python 프로세스 종료
-                                          pythonProcess.kill();
-
-                                          if (mounted) {
-                                            Navigator.of(context)
-                                                .pop(); // 로딩 다이얼로그 닫기
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    '식물 건강 상태 분석이 완료되었습니다.'),
-                                                backgroundColor: Colors.green,
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      });
-
-                                      // 30초 타임아웃
-                                      await Future.delayed(
-                                          const Duration(seconds: 30));
-                                      if (!analysisComplete) {
-                                        await subscription?.cancel();
-                                        pythonProcess.kill();
-                                        if (mounted) {
-                                          Navigator.of(context).pop();
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                  '분석 시간이 초과되었습니다. 다시 시도해주세요.'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
+                                    if (result.data['success']) {
+                                      if (mounted) {
+                                        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('식물 건강 상태 분석이 시작되었습니다. 잠시 후 결과를 확인해주세요.'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
                                       }
-                                    } else {
-                                      throw Exception('실시간 이미지를 찾을 수 없습니다.');
                                     }
                                   } catch (e) {
                                     print('건강 상태 분석 오류: $e');
                                     if (mounted) {
-                                      Navigator.of(context).pop();
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                      Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
-                                          content:
-                                              Text('건강 상태 분석 중 오류가 발생했습니다.'),
+                                          content: Text('건강 상태 분석 중 오류가 발생했습니다.'),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
